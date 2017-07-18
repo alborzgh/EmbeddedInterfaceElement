@@ -220,9 +220,15 @@ EmbeddedBeamInterface::setParameter(const char **argv, int argc, Parameter &para
 {
 	return 0;
 }
-    
-int 
+
+int
 EmbeddedBeamInterface::updateParameter(int parameterID, Information &info)
+{
+	return 0;
+}
+
+int
+EmbeddedBeamInterface::update(void)
 {
 	return 0;
 }
