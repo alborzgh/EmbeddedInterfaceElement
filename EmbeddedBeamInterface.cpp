@@ -83,8 +83,36 @@ OPS_EmbeddedBeamInterface(void)
 EmbeddedBeamInterface::EmbeddedBeamInterface(int tag): Element(tag, ELE_TAG_EmbeddedBeamInterface),
 		 externalNodes(6)
 {
-	for(int i = 0; i < 6; i++) 
-		theNodes[i] = 0;
+
+}
+
+EmbeddedBeamInterface::EmbeddedBeamInterface(int tag, int beamTag, int solidTag, int crdTransfTag, 
+	double beamRho, double beamTheta, double solidXi, double solidEta, double solidZeta, 
+	double radius) : Element(tag, ELE_TAG_EmbeddedBeamInterface),
+	externalNodes(6)
+{
+	#ifdef _PARALLEL_PROCESSING
+	#include <PartitionedDomain.h>
+		extern PartitionedDomain theDomain;
+	#else
+		extern Domain theDomain;
+	#endif
+
+		ID tempNodes = theDomain.getElement(solidTag)->getExternalNodes();
+		for (int ii = 0; ii < 8; ii++)
+			externalNodes[ii] = tempNodes(ii);
+		tempNodes = theDomain.getElement(beamTag)->getExternalNodes();
+		externalNodes[8] = tempNodes(0);
+		externalNodes[9] = tempNodes(1);
+
+		opserr << "Beam tag : " << beamTag << ", Solid tag : " << solidTag << ", Beam Iso Coordinates = (" << beamRho << "," << beamTheta << "), Solid Iso Coordinates = (" << solidXi << "," << solidEta << "," << solidZeta << ")" << endln;
+}
+
+EmbeddedBeamInterface::EmbeddedBeamInterface(int tag, int beamTag, int solidTag, int crdTransfTag, 
+	double beamRho, double beamTheta, double solidXi, double solidEta, double solidZeta, 
+	int shape, double size) : Element(tag, ELE_TAG_EmbeddedBeamInterface),
+	externalNodes(6)
+{
 }
 
 EmbeddedBeamInterface::EmbeddedBeamInterface()

@@ -44,7 +44,9 @@ class Response;
 class EmbeddedBeamInterface : public Element
 {
   public:
-    EmbeddedBeamInterface(int tag);
+	EmbeddedBeamInterface(int tag);
+	EmbeddedBeamInterface(int tag, int beamTag, int solidTag, int crdTransfTag, double beamRho, double beamTheta, double solidXi, double solidEta, double solidZeta, double radius);
+	EmbeddedBeamInterface(int tag, int beamTag, int solidTag, int crdTransfTag, double beamRho, double beamTheta, double solidXi, double solidEta, double solidZeta, int shape, double size);
     EmbeddedBeamInterface();
     ~EmbeddedBeamInterface();
 
