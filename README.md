@@ -4,7 +4,9 @@ Implementation of the embedded beam in solid interface element
 ## Add **EmbeddedBeamInterface** element to OpenSees:
 On windows, you can add EmbeddedBeamInterface.h and EmbeddedBeamInterface.cpp files to the element project in the Visual Studio solution file under UWelements, add a unique tag to the %OpenSees%/SRC/classTags.h (like "#define ELE_TAG_EmbeddedBeamInterface  501") for this element. In the TclElementCommand.cpp do the following:
 * First add this line to the beginning of the file where you see a lot of extern commands (around line 130):
+```c++
 extern void *OPS_EmbeddedBeamInterface(void);
+```
 * And add this "else if" expression to the  lines further down where you see all these "else if" statements (around line 930):
 ```c++
 else if ((strcmp(argv[1], "EmbeddedBeamInterface") == 0)) {  
@@ -24,7 +26,7 @@ This should be enough to introduce this element to OpenSees. On linux, besides e
 * In the TclModelBuilder.cpp file add the following lines:
   1. Add these somwhere around line 440:
   ```c++
-  // Added by Alborz Ghofrani - UW
+		// Added by Alborz Ghofrani - UW
 		int
 		TclCommand_GenerateInterfacePoints(ClientData clientData,
 			Tcl_Interp *interp,
@@ -33,18 +35,18 @@ This should be enough to introduce this element to OpenSees. On linux, besides e
 	```
   2. Add these somewhere around line 660 (Tcl_CreateCommand functions):
 	```c++
-    // Added by Alborz Ghofrani - UW
+		// Added by Alborz Ghofrani - UW
 		Tcl_CreateCommand(interp, "generateInterfacePoints",
 			TclCommand_GenerateInterfacePoints,
 			(ClientData)NULL, NULL);
 	```
   3. Add this somewhere around line 780 (Tcl_DeleteCommand functions):
 	```c++
-    Tcl_DeleteCommand(theInterp, "generateInterfacePoints"); // Added by Alborz Ghofrani - UW
+		Tcl_DeleteCommand(theInterp, "generateInterfacePoints"); // Added by Alborz Ghofrani - UW
 	```
   4. Add these to the end of the file:
 	```c++
-    // Added by Alborz Ghofrani - UW
+		// Added by Alborz Ghofrani - UW
 		extern int
 		TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, int argc,
 			TCL_Char **argv);
