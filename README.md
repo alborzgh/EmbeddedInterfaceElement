@@ -15,14 +15,15 @@ else if ((strcmp(argv[1], "EmbeddedBeamInterface") == 0)) {  
 		opserr << "tclelementcommand -- unable to create element of type : " << argv[1] << endln;
 	    return TCL_ERROR;
 	}
-}```
+}
+```
 	
 This should be enough to introduce this element to OpenSees. On linux, besides every change you applied to the files described above, you need to modify %OpenSees%/SRC/element/UWelements/Makefile to include EmbeddedBeamInterface.o, and in %OpenSees%/SRC/ change the Makefile to include "$(FE)/element/UWelements/EmbeddedBeamInterface.o" in the ELE_LIBS variable. You should be able to compile OpenSees applying these modifications!
 
 ## Add generateInterfacePoints command to OpenSees:
 * In the TclModelBuilder.cpp file add the following lines:
   1. Add these somwhere around line 440:
-  ```
+  ```c++
   // Added by Alborz Ghofrani - UW
 		int
 		TclCommand_GenerateInterfacePoints(ClientData clientData,
@@ -31,18 +32,18 @@ This should be enough to introduce this element to OpenSees. On linux, besides e
 			TCL_Char **argv);
 	```
   2. Add these somewhere around line 660 (Tcl_CreateCommand functions):
-	```
+	```c++
     // Added by Alborz Ghofrani - UW
 		Tcl_CreateCommand(interp, "generateInterfacePoints",
 			TclCommand_GenerateInterfacePoints,
 			(ClientData)NULL, NULL);
 	```
   3. Add this somewhere around line 780 (Tcl_DeleteCommand functions):
-	```
+	```c++
     Tcl_DeleteCommand(theInterp, "generateInterfacePoints"); // Added by Alborz Ghofrani - UW
 	```
   4. Add these to the end of the file:
-	```
+	```c++
     // Added by Alborz Ghofrani - UW
 		extern int
 		TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, int argc,
