@@ -46,7 +46,6 @@ TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, in
 	std::vector <int> eleTags;
 
 	int transfTag = 1;
-	CrdTransf *theTransf = OPS_GetCrdTransf(transfTag)->getCopy3d();
 
 	if (numArgsRemaining < 2)
 	{
@@ -161,8 +160,7 @@ TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, in
 		}
 	}
 
-
-
+    CrdTransf *theTransf = OPS_GetCrdTransf(transfTag)->getCopy3d();
 	Element *theElement;
 	theElement = theDomain.getElement(beamTag);
 	if (strcmp(theElement->getClassType(), "ElasticBeam3d") != 0)
@@ -170,9 +168,6 @@ TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, in
 		opserr << "Beam element of type " << theElement->getClassType() << "not supported." << endln;
 		return -1;
 	}
-
-	
-
 
 	
 	ElementIter& theElements = theDomain.getElements();
@@ -272,11 +267,11 @@ TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, in
 	for (int ii = 0; ii < nL; ii++)
 		for (int jj = 0; jj < nP; jj++)
 		{
-			cX(ii * nP + jj) = 0 + (double)ii / (nL - 1) * L;
+			cX(ii * nP + jj) = (1.0 + 2.0 * ii) / (2.0 * nL) * L;
 			cY(ii * nP + jj) = radius * cos(t(jj));
 			cZ(ii * nP + jj) = radius * sin(t(jj));
 
-			loc_rho(ii * nP + jj) = cX(ii * nP + jj) / L;
+            loc_rho(ii * nP + jj) = 2.0 *  (1.0 + 2.0 * ii) / (2.0 * nL) - 1.0;
 			loc_theta(ii * nP + jj) = t(jj);
 		}
 
@@ -284,6 +279,7 @@ TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, in
 	Vector cYr = cX*loc_x(1) + cY*loc_y(1) + cZ*loc_z(1) + L1y;
 	Vector cZr = cX*loc_x(2) + cY*loc_y(2) + cZ*loc_z(2) + L1z;
 
+    double area = 2.0 * PI * radius * L / nP / nL;
 
 	if (debugFlag)
 		for (int ii = 0; ii < nL; ii++)
@@ -319,11 +315,16 @@ TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, in
 			if (inBounds)
 			{
 				contactElemFlag = true;
-				if (debugFlag) opserr << "Beam tag : " << beamTag << ", Solid tag : " << eleTags[ii] << ", Real Coordinates = (" << cXr(jj) << "," << cYr(jj) << "," << cZr(jj) << "), Iso Coordinates = (" << xi << "," << eta << "," << zeta << ")" << endln;
+				if (debugFlag) 
+                    opserr << "Beam tag : " << beamTag << ", Solid tag : " << eleTags[ii] << ", Real Coordinates = (" << cXr(jj) << "," << cYr(jj) << "," << cZr(jj) << "), Iso Coordinates = (" << xi << "," << eta << "," << zeta << ")" << endln;
 
 
 				maxTag++;
-				theElement = new EmbeddedBeamInterface(maxTag, beamTag, eleTags[ii], transfTag, loc_rho(jj), loc_theta(jj), xi, eta, zeta, radius);
+				theElement = new EmbeddedBeamInterface(maxTag, beamTag, eleTags[ii], transfTag, loc_rho(jj), loc_theta(jj), xi, eta, zeta, radius, area);
+
+                char buffer[40];
+                sprintf(buffer, "%10i", maxTag);
+                Tcl_AppendResult(interp, buffer, NULL);
 
 				// if one of the above worked
 				if (theElement != 0) {
