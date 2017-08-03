@@ -94,7 +94,7 @@ EmbeddedBeamInterface::EmbeddedBeamInterface(int tag, int beamTag, int solidTag,
     theSolidTag(solidTag), theBeamTag(beamTag),
     m_solid_xi(solidXi), m_solid_eta(solidEta), m_solid_zeta(solidZeta),
     m_beam_rho(beamRho), m_beam_theta(beamTheta), m_beam_radius(radius),
-    m_area(area), m_ep(1.0e10),
+    m_area(area), m_ep(1.0e15),
     m_Ba_rot_n(3), m_Bb_rot_n(3),
     m_Ba_disp_n(3), m_Bb_disp_n(3),
     m_Ba1(3), m_Bb1(3),
@@ -218,7 +218,7 @@ EmbeddedBeamInterface::getTangentStiff(void)
             m_InterfaceStiffness(24 + ii, 24 + jj) = temp2_2(ii, jj);
 
 
-    m_InterfaceStiffness *= m_ep;
+    m_InterfaceStiffness *= m_ep * m_area;
 
     return m_InterfaceStiffness;
 }
@@ -236,7 +236,7 @@ EmbeddedBeamInterface::getResistingForce(void)
 
     Vector temp(3);
     temp  = m_pos + m_S_disp - m_B_loc;
-    temp *= m_ep;
+    temp *= m_ep * m_area;
 
     Vector c2(3), c3(3); 
     for (int ii = 0; ii < 3; ii++)
@@ -360,7 +360,7 @@ EmbeddedBeamInterface::getResponse(int responseID, Information &eleInformation)
     }
     else if (responseID == 7) { // contact force
         Vector temp(3);
-        temp = m_ep * (m_pos + m_S_disp - m_B_loc);
+        temp = m_ep * m_area * (m_pos + m_S_disp - m_B_loc);
         return eleInformation.setVector(temp);
     }
     else {
@@ -467,6 +467,8 @@ EmbeddedBeamInterface::setDomain(Domain *theDomain)
     m_Bcl_pos_n = m_Hb1 * B1 + m_Hb2 * Ba + m_Hb3 * B2 + m_Hb4 * Bb;
 
     // opserr << "element " << this->getTag() << " location = " << m_pos;
+
+    ComputeBphiAndBu(mBphi, mBu);
 
     this->DomainComponent::setDomain(theDomain);
     return;

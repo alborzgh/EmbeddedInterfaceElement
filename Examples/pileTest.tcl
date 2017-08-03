@@ -11,9 +11,9 @@ set z_min  0.0
 set z_max  5.0
 
 # define meshing parameters
-set numEle_x 10
-set numEle_y 10
-set numEle_z 10
+set numEle_x 5
+set numEle_y 5
+set numEle_z 5
 
 # create the soil geometry
 set dx [expr ($x_max-$x_min)/$numEle_x]
@@ -67,10 +67,10 @@ close $elemInfo
 model BasicBuilder -ndm 3 -ndf 6
 
 node 100001 0 0 0.0
-node 100002 0 0 6.0
+node 100002 0 0 5.0
 
 
-fix 100001    1 1 1 1 1 1
+# fix 100001    1 1 1 1 1 1
 # fix 100002    1 1 1 0 0 0 
 
 # geomTransf Linear $tag $xz1 $xz2 $xz3
