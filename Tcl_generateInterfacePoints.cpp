@@ -1,6 +1,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <vector>
+#include <set>
+#include <map>
+#include <iostream>
+#include <fstream>
 
 #include <Element.h>
 #include <OPS_Stream.h>
@@ -24,146 +28,201 @@ extern Domain theDomain;
 
 int
 TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, int argc,
-	TCL_Char **argv)
+    TCL_Char **argv)
 {
-	int numArgsRemaining = argc - 1;
-	int curArgPos = 1;
-	int res = 0;
+    int numArgsRemaining = argc - 1;
+    int curArgPos        = 1;
+    int res              = 0;
 
-	int beamTag;
-	double radius = 1.0;
-	int nP = 100;
-	int nL = 20;
-	int shape = 1;
+    int beamTag;
+    double radius = 1.0;
+    int nP        = 100;
+    int nL        = 20;
+    int shape     = 1;
 
-	bool radiusSet = false;
-	bool nPset = false;
-	bool nLset = false;
-	bool readingEleTag = false;
-	bool shapeSet = false;
-	bool eleSetDefined = false;
-	bool debugFlag = false;
-	std::vector <int> eleTags;
+    bool radiusSet     = false;
+    bool nPset         = false;
+    bool nLset         = false;
+    bool readingEleTag = false;
+    bool shapeSet      = false;
+    bool eleSetDefined = false;
+    bool debugFlag     = false;
+    bool writeCoords   = false;
 
-	int transfTag = 1;
+    int  lagrangeTag   = 3; // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange
 
-	if (numArgsRemaining < 2)
-	{
-		opserr << "Need beam tag and geometric transformation tag." << endln;
-		return -1;
-	}
-	else
-	{
-		beamTag = strtol(argv[curArgPos], NULL, 10);
-		numArgsRemaining--; curArgPos++;
-		transfTag = strtol(argv[curArgPos], NULL, 10);
-		numArgsRemaining--; curArgPos++;
-	}
+    const char * crdsFN;
+    std::vector <int> eleTags;
+    std::vector <int> eleTagsInContact;
+    std::vector <double> contactPt_xi;
+    std::vector <double> contactPt_eta;
+    std::vector <double> contactPt_zeta;
+    std::vector <double> contactPt_rho;
+    std::vector <double> contactPt_theta;
+    std::set    <int> eleTagsInContact_unique;
+
+    int transfTag = 1;
+
+    if (numArgsRemaining < 2)
+    {
+        opserr << "Need beam tag and geometric transformation tag." << endln;
+        return -1;
+    }
+    else
+    {
+        beamTag = strtol(argv[curArgPos], NULL, 10);
+        numArgsRemaining--; curArgPos++;
+        transfTag = strtol(argv[curArgPos], NULL, 10);
+        numArgsRemaining--; curArgPos++;
+    }
 
 
-	while (numArgsRemaining > 0)
-	{
-		if ((strcmp(argv[curArgPos], "-shape") == 0) && numArgsRemaining >= 2)
-		{
-			readingEleTag = false;
-			numArgsRemaining--; curArgPos++;
-			if (strcmp(argv[curArgPos], "circle") == 0)
-			{
-				shapeSet = true;
-				shape = 1;
-				numArgsRemaining--; curArgPos++;
-			}
-			else if (strcmp(argv[curArgPos], "square") == 0)
-			{
-				shapeSet = true;
-				shape = 2;
-				numArgsRemaining--; curArgPos++;
-				opserr << "The procedure for square shapes not implemented yet." << endln;
-			}
-			else if (strcmp(argv[curArgPos], "rectangle") == 0)
-			{
-				shapeSet = true;
-				shape = 4;
-				numArgsRemaining--; curArgPos++;
-				opserr << "The procedure for rectangle shapes not implemented yet." << endln;
-			}
-			else if (strcmp(argv[curArgPos], "hexagon") == 0)
-			{
-				shapeSet = true;
-				shape = 6;
-				numArgsRemaining--; curArgPos++;
-				opserr << "The procedure for hexagon shapes not implemented yet." << endln;
-			}
-			else {
-				numArgsRemaining--; curArgPos++;
-				opserr << "Unknown shape." << endln;
-			}
+    while (numArgsRemaining > 0)
+    {
+        if ((strcmp(argv[curArgPos], "-shape") == 0) && numArgsRemaining >= 2)
+        {
+            readingEleTag = false;
+            numArgsRemaining--; curArgPos++;
+            if (strcmp(argv[curArgPos], "circle") == 0)
+            {
+                shapeSet = true;
+                shape = 1;
+                numArgsRemaining--; curArgPos++;
+            }
+            else if (strcmp(argv[curArgPos], "square") == 0)
+            {
+                shapeSet = true;
+                shape = 2;
+                numArgsRemaining--; curArgPos++;
+                opserr << "The procedure for square shapes not implemented yet." << endln;
+            }
+            else if (strcmp(argv[curArgPos], "rectangle") == 0)
+            {
+                shapeSet = true;
+                shape = 4;
+                numArgsRemaining--; curArgPos++;
+                opserr << "The procedure for rectangle shapes not implemented yet." << endln;
+            }
+            else if (strcmp(argv[curArgPos], "hexagon") == 0)
+            {
+                shapeSet = true;
+                shape = 6;
+                numArgsRemaining--; curArgPos++;
+                opserr << "The procedure for hexagon shapes not implemented yet." << endln;
+            }
+            else {
+                numArgsRemaining--; curArgPos++;
+                opserr << "Unknown shape." << endln;
+            }
 
-		}
-		else if ((strcmp(argv[curArgPos], "-radius") == 0) && numArgsRemaining >= 2)
-		{
-			readingEleTag = false;
-			radiusSet = true;
-			numArgsRemaining--; curArgPos++;
-			radius = strtod(argv[curArgPos], NULL);
-			numArgsRemaining--; curArgPos++;
-		}
-		else if ((strcmp(argv[curArgPos], "-nP") == 0) && numArgsRemaining >= 2)
-		{
-			readingEleTag = false;
-			nPset = true;
-			numArgsRemaining--; curArgPos++;
-			nP = strtol(argv[curArgPos], NULL, 10);
-			numArgsRemaining--; curArgPos++;
-		}
-		else if ((strcmp(argv[curArgPos], "-nL") == 0) && numArgsRemaining >= 2)
-		{
-			readingEleTag = false;
-			nLset = true;
-			numArgsRemaining--; curArgPos++;
-			nL = strtol(argv[curArgPos], NULL, 10);
-			numArgsRemaining--; curArgPos++;
-		}
-		else if ((strcmp(argv[curArgPos], "-ele") == 0) && numArgsRemaining >= 2)
-		{
-			readingEleTag = true;
-			eleSetDefined = true;
-			numArgsRemaining--; curArgPos++;
-			eleTags.push_back(strtol(argv[curArgPos], NULL, 10));
-			numArgsRemaining--; curArgPos++;
-		}
-		else if ((strcmp(argv[curArgPos], "-eleRange") == 0) && numArgsRemaining >= 3)
-		{
-			readingEleTag = false;
-			eleSetDefined = true;
-			numArgsRemaining--; curArgPos++;
-			int startEle = strtol(argv[curArgPos], NULL, 10);
-			numArgsRemaining--; curArgPos++;
-			int endEle = strtol(argv[curArgPos], NULL, 10);
-			numArgsRemaining--; curArgPos++;
+        }
+        else if ((strcmp(argv[curArgPos], "-radius") == 0) && numArgsRemaining >= 2)
+        {
+            readingEleTag = false;
+            radiusSet = true;
+            numArgsRemaining--; curArgPos++;
+            radius = strtod(argv[curArgPos], NULL);
+            numArgsRemaining--; curArgPos++;
+        }
+        else if ((strcmp(argv[curArgPos], "-nP") == 0) && numArgsRemaining >= 2)
+        {
+            readingEleTag = false;
+            nPset = true;
+            numArgsRemaining--; curArgPos++;
+            nP = strtol(argv[curArgPos], NULL, 10);
+            numArgsRemaining--; curArgPos++;
+        }
+        else if ((strcmp(argv[curArgPos], "-nL") == 0) && numArgsRemaining >= 2)
+        {
+            readingEleTag = false;
+            nLset = true;
+            numArgsRemaining--; curArgPos++;
+            nL = strtol(argv[curArgPos], NULL, 10);
+            numArgsRemaining--; curArgPos++;
+        }
+        else if ((strcmp(argv[curArgPos], "-ele") == 0) && numArgsRemaining >= 2)
+        {
+            readingEleTag = true;
+            eleSetDefined = true;
+            numArgsRemaining--; curArgPos++;
+            eleTags.push_back(strtol(argv[curArgPos], NULL, 10));
+            numArgsRemaining--; curArgPos++;
+        }
+        else if ((strcmp(argv[curArgPos], "-eleRange") == 0) && numArgsRemaining >= 3)
+        {
+            readingEleTag = false;
+            eleSetDefined = true;
+            numArgsRemaining--; curArgPos++;
+            int startEle = strtol(argv[curArgPos], NULL, 10);
+            numArgsRemaining--; curArgPos++;
+            int endEle = strtol(argv[curArgPos], NULL, 10);
+            numArgsRemaining--; curArgPos++;
 
-			for (int ii = startEle; ii <= endEle; ii++)
-				eleTags.push_back(ii);
-		}
-		else {
-			if (readingEleTag)
-			{
-				eleTags.push_back(strtol(argv[curArgPos], NULL, 10));
-				numArgsRemaining--; curArgPos++;
-				continue;
-			}
-			else {
-				opserr << "Unknown argument ..." << endln;
-				res = -1;
-				break;
-			}
-		}
-	}
+            for (int ii = startEle; ii <= endEle; ii++)
+                eleTags.push_back(ii);
+        }
+        else if ((strcmp(argv[curArgPos], "-file") == 0) && numArgsRemaining >= 2)
+        {
+            readingEleTag = false;
+            writeCoords = true;
+            numArgsRemaining--; curArgPos++;
+            crdsFN = argv[curArgPos];
+            numArgsRemaining--; curArgPos++;
+        }
+        else if (strcmp(argv[curArgPos], "-penalty") == 0)
+        {
+            readingEleTag = false;
+            // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange
+            lagrangeTag = 0;
+            numArgsRemaining--; curArgPos++;
+        }
+        else if (strcmp(argv[curArgPos], "-AL") == 0)
+        {
+            readingEleTag = false;
+            // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange
+            lagrangeTag = 1;
+            numArgsRemaining--; curArgPos++;
+        }
+        else if (strcmp(argv[curArgPos], "-lagrange") == 0)
+        {
+            readingEleTag = false;
+            // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange
+            lagrangeTag = 2;
+            numArgsRemaining--; curArgPos++;
+        }
+        else if (strcmp(argv[curArgPos], "-embed") == 0)
+        {
+            readingEleTag = false;
+            // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange
+            lagrangeTag = 3;
+            numArgsRemaining--; curArgPos++;
+        }
+        else {
+            if (readingEleTag)
+            {
+                eleTags.push_back(strtol(argv[curArgPos], NULL, 10));
+                numArgsRemaining--; curArgPos++;
+                continue;
+            }
+            else {
+                opserr << "Unknown argument : " << argv[curArgPos] << endln;
+                res = -1;
+                break;
+            }
+        }
+    }
 
     CrdTransf *theTransf = OPS_GetCrdTransf(transfTag)->getCopy3d();
-	Element *theElement;
-	theElement = theDomain.getElement(beamTag);
-	if (strcmp(theElement->getClassType(), "ElasticBeam3d") != 0)
+    Element *theElement;
+    theElement = theDomain.getElement(beamTag);
+    const char* beamEleClassType = theElement->getClassType();
+    if (!((strcmp(beamEleClassType, "ElasticBeam3d") == 0) ||
+        (strcmp(beamEleClassType, "DispBeamColumn3d") == 0) ||
+        (strcmp(beamEleClassType, "DispBeamColumn3dThermal") == 0) ||
+        (strcmp(beamEleClassType, "ElasticTimoshenkoBeam3d") == 0) ||
+        (strcmp(beamEleClassType, "ElasticForceBeamColumn3d") == 0) ||
+        (strcmp(beamEleClassType, "ForceBeamColumn3d") == 0) ||
+        (strcmp(beamEleClassType, "ForceBeamColumn3d") == 0)) )
 	{
 		opserr << "Beam element of type " << theElement->getClassType() << "not supported." << endln;
 		return -1;
@@ -174,9 +233,15 @@ TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, in
 	int maxTag = 0;
 	while ((theElement = theElements()) != 0)
 	{
-		if (!eleSetDefined)
-			if (strcmp(theElement->getClassType(), "Brick") == 0)
-				eleTags.push_back(theElement->getTag());
+        if (!eleSetDefined)
+        {
+            const char* eleClassType = theElement->getClassType();
+            if ((strcmp(eleClassType, "Brick") == 0) ||
+                (strcmp(eleClassType, "BbarBrick") == 0) ||
+                (strcmp(eleClassType, "SSPbrick") == 0) ||
+                (strcmp(eleClassType, "BbarBrick") == 0))
+                eleTags.push_back(theElement->getTag());
+        }
 		if (theElement->getTag() > maxTag)
 			maxTag = theElement->getTag();
 	}
@@ -281,12 +346,10 @@ TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, in
 
     double area = 2.0 * PI * radius * L / nP / nL;
 
-	if (debugFlag)
-		for (int ii = 0; ii < nL; ii++)
-			for (int jj = 0; jj < nP; jj++)
-			{
-				opserr << "point " << ii * nP + jj + 1 << " : " << cXr(ii * nP + jj) << " " << cYr(ii * nP + jj) << " " << cZr(ii * nP + jj) << endln;
-			}
+    if (debugFlag)
+        for (int ii = 0; ii < nL; ii++)
+            for (int jj = 0; jj < nP; jj++)
+                opserr << "point " << ii * nP + jj + 1 << " : " << cXr(ii * nP + jj) << " " << cYr(ii * nP + jj) << " " << cZr(ii * nP + jj) << endln;
 	
 
 	Vector tempX(8), tempY(8), tempZ(8);
@@ -295,55 +358,108 @@ TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, in
 	double xi, eta, zeta;
 	bool inBounds = false;
 
-	for (int ii = 0; ii < eleTags.size(); ii++)
-	{
-		theElement = theDomain.getElement(eleTags[ii]);
-		solidNodesPtr = theElement->getNodePtrs();
-		if (debugFlag) 
-			opserr << endln << "Solid element " << eleTags[ii] << " coordiantes:" << endln;
-		for (int jj = 0; jj < 8; jj++)
-		{
-			if (debugFlag)
-				opserr << "    Node " << jj + 1 << " coordinates = " << solidNodesPtr[jj]->getCrds();
-			tempX(jj) = solidNodesPtr[jj]->getCrds()(0);
-			tempY(jj) = solidNodesPtr[jj]->getCrds()(1);
-			tempZ(jj) = solidNodesPtr[jj]->getCrds()(2);
-		}
-		for (int jj = 0; jj < nP*nL; jj++)
-		{
-			invIsoMapping(tempX, tempY, tempZ, cXr(jj), cYr(jj), cZr(jj), xi, eta, zeta, inBounds);
-			if (inBounds)
-			{
-				contactElemFlag = true;
-				if (debugFlag) 
+
+
+    std::fstream crdsFile;
+    if (writeCoords)
+        crdsFile.open(crdsFN, std::fstream::app);
+
+    for (int jj = 0; jj < nP*nL; jj++)
+    {
+        for (int ii = 0; ii < eleTags.size(); ii++)
+        {
+            theElement = theDomain.getElement(eleTags[ii]);
+            solidNodesPtr = theElement->getNodePtrs();
+            for (int kk = 0; kk < 8; kk++)
+            {
+                tempX(kk) = solidNodesPtr[kk]->getCrds()(0);
+                tempY(kk) = solidNodesPtr[kk]->getCrds()(1);
+                tempZ(kk) = solidNodesPtr[kk]->getCrds()(2);
+            }
+            invIsoMapping(tempX, tempY, tempZ, cXr(jj), cYr(jj), cZr(jj), xi, eta, zeta, inBounds);
+            if (inBounds)
+            {
+                contactElemFlag = true;
+                if (debugFlag)
                     opserr << "Beam tag : " << beamTag << ", Solid tag : " << eleTags[ii] << ", Real Coordinates = (" << cXr(jj) << "," << cYr(jj) << "," << cZr(jj) << "), Iso Coordinates = (" << xi << "," << eta << "," << zeta << ")" << endln;
 
+                eleTagsInContact_unique.insert(eleTags[ii]);
 
-				maxTag++;
-				theElement = new EmbeddedBeamInterface(maxTag, beamTag, eleTags[ii], transfTag, loc_rho(jj), loc_theta(jj), xi, eta, zeta, radius, area);
+                if (lagrangeTag > 1)
+                {
+                    eleTagsInContact.push_back(eleTags[ii]);
+                    contactPt_xi.push_back(xi);
+                    contactPt_eta.push_back(eta);
+                    contactPt_zeta.push_back(zeta);
+                    contactPt_rho.push_back(loc_rho(jj));
+                    contactPt_theta.push_back(loc_theta(jj));
+                }
+                else
+                {
+                    maxTag++;
+                    // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange
+                    if (lagrangeTag == 0)
+                        theElement = new EmbeddedBeamInterface(maxTag, beamTag, eleTags[ii], transfTag, loc_rho(jj), loc_theta(jj), xi, eta, zeta, radius, area);
+                    else if (lagrangeTag == 1)
+                        theElement = new EmbeddedBeamInterfaceAL(maxTag, beamTag, eleTags[ii], transfTag, loc_rho(jj), loc_theta(jj), xi, eta, zeta, radius, area);
 
-                char buffer[40];
-                sprintf(buffer, "%10i", maxTag);
-                Tcl_AppendResult(interp, buffer, NULL);
+                    char buffer[40];
+                    sprintf(buffer, "%10i", maxTag);
+                    Tcl_AppendResult(interp, buffer, NULL);
 
-				// if one of the above worked
-				if (theElement != 0) {
-					if (theDomain.addElement(theElement) == false) {
-						opserr << "WARNING could not add element with tag: " << theElement->getTag() << " and of type: "
-							<< theElement->getClassType() << " to the Domain\n";
-						delete theElement;
-						return -1;
-					}
-				}
+                    if (theElement != 0)
+                    {
+                        if (theDomain.addElement(theElement) == false)
+                        {
+                            opserr << "WARNING could not add element with tag: " << theElement->getTag() << " and of type: "
+                                << theElement->getClassType() << " to the Domain\n";
+                            delete theElement;
+                            return -1;
+                        }
+                    }
 
-				contactPointCount++;
-			}
-		}
-		if (contactElemFlag)
-			contactElemCount++;
-	}
+                }
 
-	opserr << "Number of elements in contact: " << contactElemCount << ", number of contact points: " << contactPointCount << endln;
+                if (writeCoords)
+                    crdsFile << maxTag << "\ " << cXr(jj) << "\ " << cYr(jj) << "\ " << cZr(jj) << "\n";
+            
+                contactPointCount++;
+                break;
+            }
+        }
+    }
+
+    // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange
+    if (lagrangeTag > 1)
+    {
+        maxTag++;
+        if (lagrangeTag == 2)
+            theElement = new EmbeddedBeamInterfaceL(maxTag, beamTag, eleTagsInContact, transfTag, contactPt_rho, contactPt_theta, contactPt_xi, contactPt_eta, contactPt_zeta, radius, area);
+        else if (lagrangeTag == 3)
+            theElement = new EmbeddedBeam(maxTag, beamTag, eleTagsInContact, transfTag, contactPt_rho, contactPt_theta, contactPt_xi, contactPt_eta, contactPt_zeta, radius, area);
+        else if (lagrangeTag == 4)
+            theElement = new EmbeddedBeamInterfaceP(maxTag, beamTag, eleTagsInContact, transfTag, contactPt_rho, contactPt_theta, contactPt_xi, contactPt_eta, contactPt_zeta, radius, area);
+
+        char buffer[40];
+        sprintf(buffer, "%10i", maxTag);
+        Tcl_AppendResult(interp, buffer, NULL);
+
+        if (theElement != 0)
+        {
+            if (theDomain.addElement(theElement) == false)
+            {
+                opserr << "WARNING could not add element with tag: " << theElement->getTag() << " and of type: "
+                    << theElement->getClassType() << " to the Domain\n";
+                delete theElement;
+                return -1;
+            }
+        }
+    }
+
+    if (writeCoords)
+        crdsFile.close();
+
+	opserr << "Number of elements in contact: " << (int) eleTagsInContact_unique.size() << ", number of contact points: " << contactPointCount << endln;
 	opserr << "EmbeddedBeamInterface Elements " << startTag << " to " << maxTag << " were created." << endln;
 
 
@@ -375,6 +491,390 @@ TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, in
 
 
 	return 0;
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+int
+TclCommand_GenerateToeInterfacePoints(ClientData clientData, Tcl_Interp *interp, int argc,
+    TCL_Char **argv)
+{
+    int numArgsRemaining = argc - 1;
+    int curArgPos        = 1;
+    int res              = 0;
+
+    int beamTag, toeNodeTag;
+    double radius = 1.0;
+    int nP        = 100;
+    int nR        = 20;
+    int shape     = 1;
+
+    bool radiusSet     = false;
+    bool nPset         = false;
+    bool nRset         = false;
+    bool readingEleTag = false;
+    bool shapeSet      = false;
+    bool eleSetDefined = false;
+    bool debugFlag     = false;
+    bool writeCoords = false;
+
+    const char * crdsFN;
+    std::vector <int> eleTags;
+    std::set    <int> eleTagsInContact_unique;
+
+    int transfTag = 1;
+
+    if (numArgsRemaining < 3)
+    {
+        opserr << "Need beam tag, geometric transformation tag and the toe node tag." << endln;
+        return -1;
+    }
+    else
+    {
+        beamTag = strtol(argv[curArgPos], NULL, 10);
+        numArgsRemaining--; curArgPos++;
+        transfTag = strtol(argv[curArgPos], NULL, 10);
+        numArgsRemaining--; curArgPos++;
+        toeNodeTag = strtol(argv[curArgPos], NULL, 10);
+        numArgsRemaining--; curArgPos++;
+    }
+
+
+    while (numArgsRemaining > 0)
+    {
+        if ((strcmp(argv[curArgPos], "-shape") == 0) && numArgsRemaining >= 2)
+        {
+            readingEleTag = false;
+            numArgsRemaining--; curArgPos++;
+            if (strcmp(argv[curArgPos], "circle") == 0)
+            {
+                shapeSet = true;
+                shape = 1;
+                numArgsRemaining--; curArgPos++;
+            }
+            else if (strcmp(argv[curArgPos], "square") == 0)
+            {
+                shapeSet = true;
+                shape = 2;
+                numArgsRemaining--; curArgPos++;
+                opserr << "The procedure for square shapes not implemented yet." << endln;
+            }
+            else if (strcmp(argv[curArgPos], "rectangle") == 0)
+            {
+                shapeSet = true;
+                shape = 4;
+                numArgsRemaining--; curArgPos++;
+                opserr << "The procedure for rectangle shapes not implemented yet." << endln;
+            }
+            else if (strcmp(argv[curArgPos], "hexagon") == 0)
+            {
+                shapeSet = true;
+                shape = 6;
+                numArgsRemaining--; curArgPos++;
+                opserr << "The procedure for hexagon shapes not implemented yet." << endln;
+            }
+            else
+            {
+                numArgsRemaining--; curArgPos++;
+                opserr << "Unknown shape." << endln;
+            }
+
+        }
+        else if ((strcmp(argv[curArgPos], "-radius") == 0) && numArgsRemaining >= 2)
+        {
+            readingEleTag = false;
+            radiusSet = true;
+            numArgsRemaining--; curArgPos++;
+            radius = strtod(argv[curArgPos], NULL);
+            numArgsRemaining--; curArgPos++;
+        }
+        else if ((strcmp(argv[curArgPos], "-nP") == 0) && numArgsRemaining >= 2)
+        {
+            readingEleTag = false;
+            nPset = true;
+            numArgsRemaining--; curArgPos++;
+            nP = strtol(argv[curArgPos], NULL, 10);
+            numArgsRemaining--; curArgPos++;
+        }
+        else if ((strcmp(argv[curArgPos], "-nR") == 0) && numArgsRemaining >= 2)
+        {
+            readingEleTag = false;
+            nRset = true;
+            numArgsRemaining--; curArgPos++;
+            nR = strtol(argv[curArgPos], NULL, 10);
+            numArgsRemaining--; curArgPos++;
+        }
+        else if ((strcmp(argv[curArgPos], "-ele") == 0) && numArgsRemaining >= 2)
+        {
+            readingEleTag = true;
+            eleSetDefined = true;
+            numArgsRemaining--; curArgPos++;
+            eleTags.push_back(strtol(argv[curArgPos], NULL, 10));
+            numArgsRemaining--; curArgPos++;
+        }
+        else if ((strcmp(argv[curArgPos], "-eleRange") == 0) && numArgsRemaining >= 3)
+        {
+            readingEleTag = false;
+            eleSetDefined = true;
+            numArgsRemaining--; curArgPos++;
+            int startEle = strtol(argv[curArgPos], NULL, 10);
+            numArgsRemaining--; curArgPos++;
+            int endEle = strtol(argv[curArgPos], NULL, 10);
+            numArgsRemaining--; curArgPos++;
+
+            for (int ii = startEle; ii <= endEle; ii++)
+                eleTags.push_back(ii);
+        }
+        else if ((strcmp(argv[curArgPos], "-file") == 0) && numArgsRemaining >= 2)
+        {
+            readingEleTag = false;
+            writeCoords = true;
+            numArgsRemaining--; curArgPos++;
+            crdsFN = argv[curArgPos];
+            numArgsRemaining--; curArgPos++;
+        }
+        else
+        {
+            if (readingEleTag)
+            {
+                eleTags.push_back(strtol(argv[curArgPos], NULL, 10));
+                numArgsRemaining--; curArgPos++;
+                continue;
+            }
+            else
+            {
+                opserr << "Unknown argument (" << argv[curArgPos] <<") ..." << endln;
+                res = -1;
+                break;
+            }
+        }
+    }
+
+    CrdTransf *theTransf = OPS_GetCrdTransf(transfTag)->getCopy3d();
+    Element *theElement;
+    theElement = theDomain.getElement(beamTag);
+    const char* beamEleClassType = theElement->getClassType();
+    if (!((strcmp(beamEleClassType, "ElasticBeam3d") == 0) ||
+        (strcmp(beamEleClassType, "DispBeamColumn3d") == 0) ||
+        (strcmp(beamEleClassType, "DispBeamColumn3dThermal") == 0) ||
+        (strcmp(beamEleClassType, "ElasticTimoshenkoBeam3d") == 0) ||
+        (strcmp(beamEleClassType, "ElasticForceBeamColumn3d") == 0) ||
+        (strcmp(beamEleClassType, "ForceBeamColumn3d") == 0) ||
+        (strcmp(beamEleClassType, "ForceBeamColumn3d") == 0)))
+    {
+        opserr << "Beam element of type " << theElement->getClassType() << "not supported." << endln;
+        return -1;
+    }
+
+
+    ElementIter& theElements = theDomain.getElements();
+    int maxTag = 0;
+    while ((theElement = theElements()) != 0)
+    {
+        if (!eleSetDefined)
+        {
+            const char* eleClassType = theElement->getClassType();
+            if ((strcmp(eleClassType, "Brick")     == 0) ||
+                (strcmp(eleClassType, "BbarBrick") == 0) ||
+                (strcmp(eleClassType, "SSPbrick")  == 0) ||
+                (strcmp(eleClassType, "BbarBrick") == 0))
+                eleTags.push_back(theElement->getTag());
+        }
+        if (theElement->getTag() > maxTag)
+            maxTag = theElement->getTag();
+    }
+    int startTag = maxTag + 1;
+
+
+
+
+    Node** solidNodesPtr;
+    Node** beamNodePtr;
+    Node*  toeNode;
+
+    beamNodePtr = theDomain.getElement(beamTag)->getNodePtrs();
+    toeNode     = theDomain.getNode(toeNodeTag);
+
+    double Tx = toeNode->getCrds()(0);
+    double Ty = toeNode->getCrds()(1);
+    double Tz = toeNode->getCrds()(2);
+
+    
+    // use the geometric transformation object to generate beam surface points
+    if (theTransf->initialize(beamNodePtr[0], beamNodePtr[1]))
+    {
+        opserr << "generateInterfacePoints: Error initializing coordinate transformation";
+        return -1;
+    }
+    Vector loc_x(3), loc_y(3), loc_z(3);
+    theTransf->getLocalAxes(loc_x, loc_y, loc_z);
+    
+
+    // create the points on the toe footprint
+    int n      = (int)ceil(nP / nR);
+    int numPts = n*nR*(nR + 1) / 2;
+    nP         = n * nR;
+
+    Vector cX(numPts), cY(numPts), cZ(numPts);
+    Vector loc_rho(numPts), loc_theta(numPts);
+    Vector pt_radius(numPts);
+    
+    int pts_Count = 0;
+    for (int ii = 0; ii < nR; ii++)
+    {
+        int this_nP = n * (ii + 1);
+        Vector t(this_nP);
+        double this_radius = (double)(ii+1) / (double)nR * radius;
+        for (int jj = 0; jj < this_nP; jj++)
+        {
+            t(jj)              = 0 + (double)jj / this_nP * 2.0 * PI;
+            cX(pts_Count + jj) = 0.0;
+            cY(pts_Count + jj) = this_radius * cos(t(jj));
+            cZ(pts_Count + jj) = this_radius * sin(t(jj));
+
+            loc_theta(pts_Count + jj) = t(jj);
+            loc_rho(pts_Count + jj)   = 0.0;
+            pt_radius(pts_Count + jj) = this_radius;
+        }
+        pts_Count += this_nP;
+    }
+
+    Vector cXr = cX*loc_x(0) + cY*loc_y(0) + cZ*loc_z(0) + Tx;
+    Vector cYr = cX*loc_x(1) + cY*loc_y(1) + cZ*loc_z(1) + Ty;
+    Vector cZr = cX*loc_x(2) + cY*loc_y(2) + cZ*loc_z(2) + Tz;
+
+    double area = PI * radius * radius / numPts;
+
+    if (debugFlag)
+        for (int ii = 0; ii < numPts; ii++)
+                opserr << "point " << ii + 1 << " : " << cXr(ii) << " " << cYr(ii) << " " << cZr(ii) << endln;
+
+
+    Vector tempX(8), tempY(8), tempZ(8);
+    int contactElemCount = 0, contactPointCount = 0;
+    bool contactElemFlag = false;
+    double xi, eta, zeta;
+    bool inBounds = false;
+
+
+
+
+    std::fstream crdsFile;
+    if (writeCoords)
+        crdsFile.open(crdsFN, std::fstream::app);
+
+    for (int jj = 0; jj < numPts; jj++)
+    {
+        for (int ii = 0; ii < eleTags.size(); ii++)
+        {
+            theElement = theDomain.getElement(eleTags[ii]);
+            solidNodesPtr = theElement->getNodePtrs();
+
+            for (int kk = 0; kk < 8; kk++)
+            {
+                if (debugFlag)
+                    opserr << "    Node " << kk + 1 << " coordinates = " << solidNodesPtr[kk]->getCrds();
+                tempX(kk) = solidNodesPtr[kk]->getCrds()(0);
+                tempY(kk) = solidNodesPtr[kk]->getCrds()(1);
+                tempZ(kk) = solidNodesPtr[kk]->getCrds()(2);
+            }
+            invIsoMapping(tempX, tempY, tempZ, cXr(jj), cYr(jj), cZr(jj), xi, eta, zeta, inBounds);
+            if (inBounds)
+            {
+                contactElemFlag = true;
+                //if (debugFlag)
+                    opserr << "Beam tag : " << beamTag << ", Solid tag : " << eleTags[ii] << ", Real Coordinates = (" << cXr(jj) << "," << cYr(jj) << "," << cZr(jj) << "), Iso Coordinates = (" << xi << "," << eta << "," << zeta << ")" << endln;
+
+
+                maxTag++;
+                theElement = new EmbeddedBeamInterface(maxTag, beamTag, eleTags[ii], transfTag, loc_rho(jj), loc_theta(jj), xi, eta, zeta, pt_radius(jj), area);
+
+                char buffer[40];
+                sprintf(buffer, "%10i", maxTag);
+                Tcl_AppendResult(interp, buffer, NULL);
+
+                // if one of the above worked
+                if (theElement != 0)
+                {
+                    if (theDomain.addElement(theElement) == false)
+                    {
+                        opserr << "WARNING could not add element with tag: " << theElement->getTag() << " and of type: "
+                            << theElement->getClassType() << " to the Domain\n";
+                        delete theElement;
+                        return -1;
+                    }
+                }
+
+                if (writeCoords)
+                    crdsFile << maxTag << "\ " << cXr(jj) << "\ " << cYr(jj) << "\ " << cZr(jj) << "\n";
+
+
+                eleTagsInContact_unique.insert(eleTags[ii]);
+
+                contactPointCount++;
+                break;
+            }
+        }
+    }
+
+    opserr << "Number of elements in contact: " << (int)eleTagsInContact_unique.size() << ", number of contact points: " << contactPointCount << endln;
+    opserr << "EmbeddedBeamInterface Elements " << startTag << " to " << maxTag << " were created." << endln;
+
+
+    if (debugFlag)
+    {
+        if (radiusSet)
+            opserr << "Radius is set to " << radius << endln;
+        else
+            opserr << "No radius is set!!! Assuming 1.0" << endln;
+        if (nPset)
+            opserr << "nP is set to " << nP << endln;
+        else
+            opserr << "nP not set!!! Assuming " << nP << endln;
+        if (nRset)
+            opserr << "nL is set to " << nR << endln;
+        else
+            opserr << "nL not set!!! Assuming " << nR << endln;
+        if (shapeSet)
+            opserr << "Shape is set to " << shape << endln;
+        else
+            opserr << "Default shape (circle) is assumed." << endln;
+        if (eleTags.size() > 0)
+            opserr << "Here are the elements: \n     { ";
+        for (int ii = 0; ii < eleTags.size(); ii++)
+            opserr << eleTags[ii] << " ";
+        if (eleTags.size() > 0)
+            opserr << "}" << endln;
+    }
+
+
+    return 0;
 
 }
 
@@ -480,3 +980,4 @@ invIsoMapping(Vector nodesX, Vector nodesY, Vector nodesZ, double Px, double Py,
 	// opserr << "Did not converge in 20 steps." << endln;
 	return -1;
 }
+

@@ -94,7 +94,7 @@ EmbeddedBeamInterface::EmbeddedBeamInterface(int tag, int beamTag, int solidTag,
     theSolidTag(solidTag), theBeamTag(beamTag),
     m_solid_xi(solidXi), m_solid_eta(solidEta), m_solid_zeta(solidZeta),
     m_beam_rho(beamRho), m_beam_theta(beamTheta), m_beam_radius(radius),
-    m_area(area), m_ep(1.0e15),
+    m_area(area), m_ep(1.0e12),
     m_Ba_rot_n(3), m_Bb_rot_n(3),
     m_Ba_disp_n(3), m_Bb_disp_n(3),
     m_Ba1(3), m_Bb1(3),
@@ -236,6 +236,7 @@ EmbeddedBeamInterface::getResistingForce(void)
 
     Vector temp(3);
     temp  = m_pos + m_S_disp - m_B_loc;
+    opserr << temp;
     temp *= m_ep * m_area;
 
     Vector c2(3), c3(3); 

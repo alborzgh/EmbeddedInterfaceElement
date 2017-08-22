@@ -13,6 +13,10 @@
 #include <ID.h>
 
 #include <EmbeddedBeamInterface.h>
+#include <EmbeddedBeamInterfaceL.h>
+#include <EmbeddedBeamInterfaceP.h>
+#include <EmbeddedBeamInterfaceAL.h>
+#include <EmbeddedBeam.h>
 
 const double PI = 3.14159265359;
 
