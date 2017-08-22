@@ -692,6 +692,10 @@
 #define ELE_TAG_ShellNLDKGQThermal        174   //L.Jiang [SIF]
 #define ELE_TAG_ShellANDeS                175   //L.Jiang [SIF]
 #define ELE_TAG_EmbeddedBeamInterface     176   //Alborz Ghofrani [UW]
+#define ELE_TAG_EmbeddedBeamInterfaceL    177   //Alborz Ghofrani [UW]
+#define ELE_TAG_EmbeddedBeamInterfaceAL   178   //Alborz Ghofrani [UW]
+#define ELE_TAG_EmbeddedBeamInterfaceP    179   //Alborz Ghofrani [UW]
+#define ELE_TAG_EmbeddedBeam              180   //Alborz Ghofrani [UW]
 
 #define FRN_TAG_Coulomb            1
 #define FRN_TAG_VelDependent       2

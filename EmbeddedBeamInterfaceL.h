@@ -20,42 +20,39 @@
 
 // Written: Alborz Ghofrani, Diego Turello, Pedro Arduino, U.Washington 
 // Created: May 2017
-// Description: This file contains the class definition for EmbeddedBeam.
+// Description: This file contains the class definition for EmbeddedBeamInterfaceL.
 
-#ifndef EmbedBeam_h
-#define EmbedBeam_h
+#ifndef EmbedBeamInterfaceL_h
+#define EmbedBeamInterfaceL_h
 
 #include <Element.h>
 #include <Matrix.h>
 #include <Vector.h>
 #include <ID.h>
-#include <SP_Constraint.h>
-#include <SP_ConstraintIter.h>
-#include <ConstraintHandler.h>
 
 #include <vector>
 #include <set>
 #include <map>
 
 // number of dimensions
-#define EB_NUM_DIM  3
+#define EBIL_NUM_DIM  3
 
 class Node;
 class NDMaterial;
 class Response;
 class CrdTransf;
 
-class EmbeddedBeam : public Element
+class EmbeddedBeamInterfaceL : public Element
 {
 public:
-    EmbeddedBeam(int tag);
-    EmbeddedBeam(int tag, int beamTag, std::vector <int> solidTag, int crdTransfTag, 
+    EmbeddedBeamInterfaceL(int tag);
+    EmbeddedBeamInterfaceL(int tag, int beamTag, std::vector <int> solidTag, int crdTransfTag, 
         std::vector <double>  beamRho, std::vector <double>  beamTheta, std::vector <double>  solidXi,
         std::vector <double>  solidEta, std::vector <double>  solidZeta, double radius, double area);
-    EmbeddedBeam();
-    ~EmbeddedBeam();
+    EmbeddedBeamInterfaceL();
+    ~EmbeddedBeamInterfaceL();
 
-    const char *getClassType(void) const { return "EmbeddedBeam"; };
+    const char *getClassType(void) const { return "EmbeddedBeamInterfaceL"; };
 
     int getNumExternalNodes(void) const;
     const ID &getExternalNodes(void);
@@ -95,19 +92,15 @@ protected:
 
 private:
     // private attributes - a copy for each object of the class
-    int EB_numNodes, EB_numDOF;
+    int EBIL_numNodes, EBIL_numDOF;
 
     ID externalNodes; // Tags of beam and solid nodes
-
-    Node **theNodes;
 
     int *theSolidTag;
     int *solidNodeTags;
     int theBeamTag;
 
-    Element* theBeam;
-
-    SP_Constraint **theConstraints;
+    Node **theNodes;
 
     Vector		m_InterfaceForces;	// force vector
     Matrix		m_InterfaceStiffness;	// stiffness matrix
@@ -121,8 +114,6 @@ private:
     Vector m_beam_rho;
     Vector m_beam_theta;
 
-    int     m_numSolidNodes, m_numEmbeddedPoints;
-
     // shape functions
     Vector  m_Ns;
     double  m_Hb1, m_Hb2, m_Hb3, m_Hb4, m_Nb1, m_Nb2;
@@ -130,9 +121,22 @@ private:
 
     double	m_beam_radius;	 // beam Radius
     double  m_beam_length;   // beam length
+    double	m_ep;		     // penalty parameter
     double  m_area;          // interface element area
 
+    int     m_numSolidNodes, m_numEmbeddedPoints;
+
     CrdTransf* crdTransf;  // pointer to coordinate tranformation object
+
+    double  m_Force;
+
+    Vector m_Ba_rot_n, m_Bb_rot_n;
+    Vector m_Ba_disp_n, m_Bb_disp_n;
+    Vector m_Bcl_pos, m_Bcl_pos_n;
+    Vector m_B_loc, m_S_disp;
+    Vector m_Ba1, m_Bb1;
+    Vector m_pos;
+
 
     // copied from BeamContact3D
     double mchi;                // twist rotation from end 1 to end 2
@@ -140,9 +144,8 @@ private:
     Matrix mQb;                 // coordinate transform for node b
     Matrix mQc;
     Vector mc1;                 // tangent vector at project point c
-    Vector m_Ba_rot_n, m_Bb_rot_n;
     Matrix mBphi, mBu, mHf;
-    Matrix mA, mB, mB_inv, mKbb;
+    Matrix mA, mB;
 
     void ComputeBphiAndBu(Matrix &Bphi, Matrix &Bu);            // method to compute Bphi and Bu, used in ComputeB and update
     void ComputeHf(Matrix &Hf, double theta);                   // method to compute Hf

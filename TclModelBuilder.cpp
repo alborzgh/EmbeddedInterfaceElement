@@ -442,9 +442,15 @@ TclCommand_Package(ClientData clientData, Tcl_Interp *interp, int argc,
 // Added by Alborz Ghofrani - UW
 int
 TclCommand_GenerateInterfacePoints(ClientData clientData,
-	Tcl_Interp *interp,
-	int argc,
-	TCL_Char **argv);
+    Tcl_Interp *interp,
+    int argc,
+    TCL_Char **argv);
+
+int
+TclCommand_GenerateToeInterfacePoints(ClientData clientData,
+    Tcl_Interp *interp,
+    int argc,
+    TCL_Char **argv);
 
 //
 // CLASS CONSTRUCTOR & DESTRUCTOR
@@ -667,8 +673,11 @@ TclModelBuilder::TclModelBuilder(Domain &theDomain, Tcl_Interp *interp, int NDM,
     
   // Added by Alborz Ghofrani - UW
   Tcl_CreateCommand(interp, "generateInterfacePoints",
-	  TclCommand_GenerateInterfacePoints,
-	  (ClientData)NULL, NULL);
+      TclCommand_GenerateInterfacePoints,
+      (ClientData)NULL, NULL);
+  Tcl_CreateCommand(interp, "generateToeInterfacePoints",
+      TclCommand_GenerateToeInterfacePoints,
+      (ClientData)NULL, NULL);
 
   
   // set the static pointers in this file
@@ -791,6 +800,7 @@ TclModelBuilder::~TclModelBuilder()
   Tcl_DeleteCommand(theInterp, "loadPackage");
 
   Tcl_DeleteCommand(theInterp, "generateInterfacePoints"); // Added by Alborz Ghofrani - UW
+  Tcl_DeleteCommand(theInterp, "generateToeInterfacePoints"); // Added by Alborz Ghofrani - UW
 }
 
 
@@ -4757,6 +4767,9 @@ TclCommand_Package(ClientData clientData, Tcl_Interp *interp, int argc, TCL_Char
 // Added by Alborz Ghofrani - UW
 extern int
 TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, int argc,
-	TCL_Char **argv);
+    TCL_Char **argv);
+extern int
+TclCommand_GenerateToeInterfacePoints(ClientData clientData, Tcl_Interp *interp, int argc,
+    TCL_Char **argv);
 
 
