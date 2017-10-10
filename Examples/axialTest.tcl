@@ -2,6 +2,9 @@ wipe
 
 model BasicBuilder -ndm 3 -ndf 3
 
+# set the flag for using SSP elements ( 0 : standard brick - 1 : SSP brick)
+set useSSP 1
+
 # define the domain
 set x_min -5.0
 set x_max  5.0
@@ -21,10 +24,10 @@ set b_y1  0.0
 set b_z1  10.0
 set b_x2  0.0
 set b_y2  0.0
-set b_z2  21.0
+set b_z2  20.0
 
 # define beam meshing parameter
-set b_numEle 11
+set b_numEle 10
 
 # define number of descritization points
 set nP 8
@@ -70,7 +73,11 @@ for {set ii 0} {$ii < $numEle_x} {incr ii} {
 			set node7 [expr $node3 + 1]
 			set node8 [expr $node4 + 1]
 		
-			element stdBrick [expr $numEle_y*$numEle_z*$ii + $numEle_z*$jj + $kk + 1] $node1 $node2 $node3 $node4 $node5 $node6 $node7 $node8 1 
+			if {$useSSP == 1} {
+				element SSPbrick [expr $numEle_y*$numEle_z*$ii + $numEle_z*$jj + $kk + 1] $node1 $node2 $node3 $node4 $node5 $node6 $node7 $node8 1 
+			} else {
+				element stdBrick [expr $numEle_y*$numEle_z*$ii + $numEle_z*$jj + $kk + 1] $node1 $node2 $node3 $node4 $node5 $node6 $node7 $node8 1 
+			}
 			puts $elemInfo "[expr $numEle_y*$numEle_z*$ii + $numEle_z*$jj + $kk + 1] $node1 $node2 $node3 $node4 $node5 $node6 $node7 $node8 1"
 		}
 	}
@@ -115,19 +122,18 @@ close $elemInfo
 set interfaceElemsFile "interfaceInfo.dat"
 if {[file exists $interfaceElemsFile] == 1} { file delete $interfaceElemsFile }
 
+# fix 100001   1 1 1 1 1 1
+
 set interfaceElems {}
-for {set ii 0} {$ii < $b_numEle - 1} {incr ii}	{
+for {set ii 0} {$ii < $b_numEle} {incr ii}	{
 	set elem [expr 100000 + $ii + 1]
 	set interfaceElems [concat $interfaceElems [generateInterfacePoints $elem 1  -gPenalty -shape circle -nP $nP -nL $nL -radius $radius -file $interfaceElemsFile ]]
 }
-
-	# set interfaceElems [concat $interfaceElems [generateInterfacePoints [expr 100000 + $b_numEle -1] 1  -embed -shape circle -nP $nP -nL $nL -radius $radius -file $interfaceElemsFile -connectedBeams [expr 100000 + $b_numEle]]]
-# set interfaceElems [concat $interfaceElems [generateToeInterfacePoints 100001 1 100001 -shape circle -nP 4 -nR 1 -radius $radius -file $interfaceElemsFile ]]
+set interfaceElems [concat $interfaceElems [generateToeInterfacePoints 100001 1 100001 -gPenalty -shape circle -nP 4 -nR 2 -radius $radius -file $interfaceElemsFile ]]
 
 pattern Plain 1 {Series -time {0 1 1e10} -values {0 1 1} -factor 1} {
-    load [expr 100000 + $b_numEle + 1]  1.0e4  0.0    0.0   0.0 0.0 0.0
+    load [expr 100000 + $b_numEle + 1]  0.0  0.0    -100000.0   0.0  0.0   0.0
 }
-
 
 eval "recorder Element -time -file contactBeam.out -ele $interfaceElems locBeam"
 eval "recorder Element -time -file contactDisp.out -ele $interfaceElems disp"
@@ -137,16 +143,37 @@ eval "recorder Element -time -file c2.out -ele $interfaceElems c2"
 eval "recorder Element -time -file c3.out -ele $interfaceElems c3"
 recorder Node    -time -file beamDisp.out -nodeRange 100001 [expr 100001 + $b_numEle] -dof 1 2 3 4 5 6  disp
 recorder Node    -time -file displacement.out -nodeRange 1 [expr ($numEle_y+1)*($numEle_z+1)*($numEle_z+1)]  -dof 1 2 3 disp
-recorder Element -time -file stress.out -eleRange 1 [expr $numEle_x*$numEle_y*$numEle_z] material 1 stress
-recorder Element -time -file strain.out -eleRange 1 [expr $numEle_x*$numEle_y*$numEle_z] material 1 strain
 
-set dt 0.2
-set numSteps 5
+if {$useSSP == 1} {
+	recorder Element -time -file stress.out -eleRange 1 [expr $numEle_x*$numEle_y*$numEle_z] stress
+	recorder Element -time -file strain.out -eleRange 1 [expr $numEle_x*$numEle_y*$numEle_z] strain
+} else {
+	recorder Element -time -file stress1.out -eleRange 1 [expr $numEle_x*$numEle_y*$numEle_z] material 1 stress
+	recorder Element -time -file strain1.out -eleRange 1 [expr $numEle_x*$numEle_y*$numEle_z] material 1 strain
+	recorder Element -time -file stress2.out -eleRange 1 [expr $numEle_x*$numEle_y*$numEle_z] material 2 stress
+	recorder Element -time -file strain2.out -eleRange 1 [expr $numEle_x*$numEle_y*$numEle_z] material 2 strain
+	recorder Element -time -file stress3.out -eleRange 1 [expr $numEle_x*$numEle_y*$numEle_z] material 3 stress
+	recorder Element -time -file strain3.out -eleRange 1 [expr $numEle_x*$numEle_y*$numEle_z] material 3 strain
+	recorder Element -time -file stress4.out -eleRange 1 [expr $numEle_x*$numEle_y*$numEle_z] material 4 stress
+	recorder Element -time -file strain4.out -eleRange 1 [expr $numEle_x*$numEle_y*$numEle_z] material 4 strain
+	recorder Element -time -file stress5.out -eleRange 1 [expr $numEle_x*$numEle_y*$numEle_z] material 5 stress
+	recorder Element -time -file strain5.out -eleRange 1 [expr $numEle_x*$numEle_y*$numEle_z] material 5 strain
+	recorder Element -time -file stress6.out -eleRange 1 [expr $numEle_x*$numEle_y*$numEle_z] material 6 stress
+	recorder Element -time -file strain6.out -eleRange 1 [expr $numEle_x*$numEle_y*$numEle_z] material 6 strain
+	recorder Element -time -file stress7.out -eleRange 1 [expr $numEle_x*$numEle_y*$numEle_z] material 7 stress
+	recorder Element -time -file strain7.out -eleRange 1 [expr $numEle_x*$numEle_y*$numEle_z] material 7 strain
+	recorder Element -time -file stress8.out -eleRange 1 [expr $numEle_x*$numEle_y*$numEle_z] material 8 stress
+	recorder Element -time -file strain8.out -eleRange 1 [expr $numEle_x*$numEle_y*$numEle_z] material 8 strain
+}
+
+set dt 0.1
+set numSteps 10
 
 # Create analysis
 constraints Transformation
+# constraints Penalty 1.0e15 1.0e15
 # test        NormDispIncr 1.0e-10 20 1
-test EnergyIncr 1.0e-20 20 1
+test EnergyIncr 1.0e-15 20 1
 # test NormUnbalance 1.0e-11 20 1
 # test FixedNumIter 2 1
 algorithm   Newton
@@ -161,5 +188,6 @@ analyze $numSteps
 wipe
 
 set batchFile [open writeGiD.bat w]
-puts $batchFile "GiDFlaviaWriter -solidNodeInfo nodeInfo.dat -solidElemInfo elementInfo.dat -beamNodeInfo nodeInfoB.dat -beamElemInfo elementInfoB.dat -nSolidNodes [expr ($numEle_x + 1)*($numEle_y + 1)*($numEle_z + 1)] -nSolidElems [expr $numEle_x*$numEle_y*$numEle_z] -nBeamNodes [expr $b_numEle+1] -nBeamElems $b_numEle -output res -binary -nTimeSteps $numSteps -solidDispInfo displacement.out -beamDispInfo beamDisp.out -interfacePtInfo interfaceInfo.dat -nInterfacePts [expr $b_numEle * $nP * $nL] -intPtDispInfo contactDisp.out"
+# puts $batchFile "GiDFlaviaWriter -solidNodeInfo nodeInfo.dat -solidElemInfo elementInfo.dat -beamNodeInfo nodeInfoB.dat -beamElemInfo elementInfoB.dat -nSolidNodes [expr ($numEle_x + 1)*($numEle_y + 1)*($numEle_z + 1)] -nSolidElems [expr $numEle_x*$numEle_y*$numEle_z] -nBeamNodes [expr $b_numEle+1] -nBeamElems $b_numEle -output res -binary -nTimeSteps $numSteps -solidDispInfo displacement.out -beamDispInfo beamDisp.out -interfacePtInfo interfaceInfo.dat -nInterfacePts [expr $b_numEle * $nP * $nL] -intPtDispInfo contactDisp.out"
+puts $batchFile "GiDFlaviaWriter -solidNodeInfo nodeInfo.dat -solidElemInfo elementInfo.dat -beamNodeInfo nodeInfoB.dat -beamElemInfo elementInfoB.dat -nSolidNodes [expr ($numEle_x + 1)*($numEle_y + 1)*($numEle_z + 1)] -nSolidElems [expr $numEle_x*$numEle_y*$numEle_z] -nBeamNodes [expr $b_numEle+1] -nBeamElems $b_numEle -output res -binary -nTimeSteps $numSteps -solidDispInfo displacement.out -beamDispInfo beamDisp.out -interfacePtInfo interfaceInfo.dat -nInterfacePts 6 -intPtDispInfo contactDisp.out"
 close $batchFile

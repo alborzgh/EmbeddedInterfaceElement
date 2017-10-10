@@ -21,13 +21,13 @@ set b_y1  0.0
 set b_z1  10.0
 set b_x2  0.0
 set b_y2  0.0
-set b_z2  21.0
+set b_z2  20.0
 
 # define beam meshing parameter
-set b_numEle 11
+set b_numEle 10
 
 # define number of descritization points
-set nP 8
+set nP 4
 set nL 8
 
 # create the soil geometry
@@ -56,6 +56,8 @@ fixZ $z_min 1 1 1
 # create the soil material and elements
 #          ElasticIsotropic $tag $E $poisson
 nDMaterial ElasticIsotropic 1 1e8 0.33
+nDMaterial ElasticIsotropic 2 1e12 0.33
+# nDMaterial J2Plasticity 2 [expr 3.0*(1.0 +0.33)/(2.0*(1-2.0*0.33)) * 1.0e12] 1.0e12 0.5e6 0.5e6 0.0 0.0 
 
 set elemInfo [open elementInfo.dat w]
 for {set ii 0} {$ii < $numEle_x} {incr ii} {
@@ -92,8 +94,10 @@ for {set ii 0} {$ii <= $b_numEle} {incr ii} {
 }
 close $nodeInfo
 
+# fix 100001 1 1 1 1 1 1 
+
 # geomTransf Linear $tag $xz1 $xz2 $xz3
-geomTransf Linear 1   0.0 1.0 0.0
+geomTransf Linear 1   -1.0 1.0 0.0
 
 set radius 0.25
 set area   [expr 3.14159 * $radius * $radius]
@@ -112,22 +116,19 @@ for {set ii 0} {$ii < $b_numEle} {incr ii}	{
 }
 close $elemInfo
 
+pattern Plain 1 {Series -time {0 1 1e10} -values {0 1 1} -factor 1} {
+    load [expr 100000 + $b_numEle + 1]  10000.0  0.0    0.0   0.0 10000.0 0.0
+}
+
 set interfaceElemsFile "interfaceInfo.dat"
 if {[file exists $interfaceElemsFile] == 1} { file delete $interfaceElemsFile }
 
 set interfaceElems {}
-for {set ii 0} {$ii < $b_numEle - 1} {incr ii}	{
+for {set ii 0} {$ii < $b_numEle} {incr ii}	{
 	set elem [expr 100000 + $ii + 1]
-	set interfaceElems [concat $interfaceElems [generateInterfacePoints $elem 1  -gPenalty -shape circle -nP $nP -nL $nL -radius $radius -file $interfaceElemsFile ]]
+	set interfaceElems [concat $interfaceElems [generateInterfacePoints $elem 1  -ElastoPlastic -mat 2 -shape circle -nP $nP -nL $nL -radius $radius -file $interfaceElemsFile ]]
 }
-
-	# set interfaceElems [concat $interfaceElems [generateInterfacePoints [expr 100000 + $b_numEle -1] 1  -embed -shape circle -nP $nP -nL $nL -radius $radius -file $interfaceElemsFile -connectedBeams [expr 100000 + $b_numEle]]]
 # set interfaceElems [concat $interfaceElems [generateToeInterfacePoints 100001 1 100001 -shape circle -nP 4 -nR 1 -radius $radius -file $interfaceElemsFile ]]
-
-pattern Plain 1 {Series -time {0 1 1e10} -values {0 1 1} -factor 1} {
-    load [expr 100000 + $b_numEle + 1]  1.0e4  0.0    0.0   0.0 0.0 0.0
-}
-
 
 eval "recorder Element -time -file contactBeam.out -ele $interfaceElems locBeam"
 eval "recorder Element -time -file contactDisp.out -ele $interfaceElems disp"
@@ -140,15 +141,16 @@ recorder Node    -time -file displacement.out -nodeRange 1 [expr ($numEle_y+1)*(
 recorder Element -time -file stress.out -eleRange 1 [expr $numEle_x*$numEle_y*$numEle_z] material 1 stress
 recorder Element -time -file strain.out -eleRange 1 [expr $numEle_x*$numEle_y*$numEle_z] material 1 strain
 
-set dt 0.2
-set numSteps 5
+set dt 0.1
+set numSteps 10
 
 # Create analysis
 constraints Transformation
-# test        NormDispIncr 1.0e-10 20 1
-test EnergyIncr 1.0e-20 20 1
-# test NormUnbalance 1.0e-11 20 1
-# test FixedNumIter 2 1
+# constraints Penalty 1.0e15 1.0e15
+# test        NormDispIncr 1.0e-5 100 1
+test EnergyIncr 1.0e-12 20 1
+# test NormUnbalance 1.0e-6 20 1
+# test FixedNumIter 5 1
 algorithm   Newton
 numberer    RCM
 system      Mumps
