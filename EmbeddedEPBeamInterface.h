@@ -20,12 +20,13 @@
 
 // Written: Alborz Ghofrani, Diego Turello, Pedro Arduino, U.Washington 
 // Created: May 2017
-// Description: This file contains the class definition for EmbeddedBeamInterfaceP.
+// Description: This file contains the class definition for EmbeddedEPBeamInterface.
 
-#ifndef EmbedBeamInterfaceP_h
-#define EmbedBeamInterfaceP_h
+#ifndef EmbedEPBeamInterface_h
+#define EmbedEPBeamInterface_h
 
 #include <Element.h>
+#include <NDMaterial.h>
 #include <Matrix.h>
 #include <Vector.h>
 #include <ID.h>
@@ -35,24 +36,24 @@
 #include <map>
 
 // number of dimensions
-#define EBIP_NUM_DIM  3
+#define EEPBIP_NUM_DIM  3
 
 class Node;
 class NDMaterial;
 class Response;
 class CrdTransf;
 
-class EmbeddedBeamInterfaceP : public Element
+class EmbeddedEPBeamInterface : public Element
 {
 public:
-    EmbeddedBeamInterfaceP(int tag);
-    EmbeddedBeamInterfaceP(int tag, int beamTag, std::vector <int> solidTag, int crdTransfTag, 
+    EmbeddedEPBeamInterface(int tag);
+    EmbeddedEPBeamInterface(int tag, int beamTag, std::vector <int> solidTag, int crdTransfTag, int matTag,
         std::vector <double>  beamRho, std::vector <double>  beamTheta, std::vector <double>  solidXi,
-        std::vector <double>  solidEta, std::vector <double>  solidZeta, double radius, double area);
-    EmbeddedBeamInterfaceP();
-    ~EmbeddedBeamInterfaceP();
+        std::vector <double>  solidEta, std::vector <double>  solidZeta, double radius, double area, double width = 0.0);
+    EmbeddedEPBeamInterface();
+    ~EmbeddedEPBeamInterface();
 
-    const char *getClassType(void) const { return "EmbeddedBeamInterfaceP"; };
+    const char *getClassType(void) const { return "EmbeddedEPBeamInterface"; };
 
     int getNumExternalNodes(void) const;
     const ID &getExternalNodes(void);
@@ -92,13 +93,14 @@ protected:
 
 private:
     // private attributes - a copy for each object of the class
-    int EBIP_numNodes, EBIP_numDOF;
+    int EEPBI_numNodes, EEPBI_numDOF;
 
     ID externalNodes; // Tags of beam and solid nodes
 
     int *theSolidTag;
     int *solidNodeTags;
     int theBeamTag;
+    int theMatTag;
 
     Node **theNodes;
 
@@ -123,10 +125,12 @@ private:
     double  m_beam_length;   // beam length
     double	m_ep;		     // penalty parameter
     double  m_area;          // interface element area
+    double  m_intWidth;      // interface width
 
     int     m_numSolidNodes, m_numEmbeddedPoints;
 
-    CrdTransf* crdTransf;  // pointer to coordinate tranformation object
+    CrdTransf*  crdTransf;  // pointer to coordinate tranformation object
+    NDMaterial** theMat;     // pointer to the interface material
 
     double  m_Force;
     Vector  m_Lambda;
@@ -137,6 +141,7 @@ private:
     Vector m_B_loc, m_S_disp;
     Vector m_Ba1, m_Bb1;
     Vector m_pos;
+    Vector m_uRel;
 
 
     // copied from BeamContact3D
@@ -146,7 +151,7 @@ private:
     Matrix mQc;
     Vector mc1;                 // tangent vector at project point c
     Matrix mBphi, mBu, mHf;
-    Matrix mA, mB, mAt, mBt, mAAt, mBBt, mABt;
+    Matrix mA, mB, mAt, mBt, mAAt, mBBt, mABt, mBinv, mBinvTAT;
 
     void ComputeBphiAndBu(Matrix &Bphi, Matrix &Bu);            // method to compute Bphi and Bu, used in ComputeB and update
     void ComputeHf(Matrix &Hf, double theta);                   // method to compute Hf
@@ -169,6 +174,8 @@ private:
     Vector GetInteractionPtForce();
 
 };
+
+extern NDMaterial *OPS_getNDMaterial(int tag);
 
 #endif
 

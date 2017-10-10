@@ -20,39 +20,42 @@
 
 // Written: Alborz Ghofrani, Diego Turello, Pedro Arduino, U.Washington 
 // Created: May 2017
-// Description: This file contains the class definition for EmbeddedBeamInterfaceP.
+// Description: This file contains the class definition for EmbeddedBeamToe.
 
-#ifndef EmbedBeamInterfaceP_h
-#define EmbedBeamInterfaceP_h
+#ifndef EmbedBeamToe_h
+#define EmbedBeamToe_h
 
 #include <Element.h>
 #include <Matrix.h>
 #include <Vector.h>
 #include <ID.h>
+#include <SP_Constraint.h>
+#include <SP_ConstraintIter.h>
+#include <ConstraintHandler.h>
 
 #include <vector>
 #include <set>
 #include <map>
 
 // number of dimensions
-#define EBIP_NUM_DIM  3
+#define EBT_NUM_DIM  3
 
 class Node;
 class NDMaterial;
 class Response;
 class CrdTransf;
 
-class EmbeddedBeamInterfaceP : public Element
+class EmbeddedBeamToe : public Element
 {
 public:
-    EmbeddedBeamInterfaceP(int tag);
-    EmbeddedBeamInterfaceP(int tag, int beamTag, std::vector <int> solidTag, int crdTransfTag, 
+    EmbeddedBeamToe(int tag);
+    EmbeddedBeamToe(int tag, int beamTag, std::vector <int> solidTag, int crdTransfTag, 
         std::vector <double>  beamRho, std::vector <double>  beamTheta, std::vector <double>  solidXi,
-        std::vector <double>  solidEta, std::vector <double>  solidZeta, double radius, double area);
-    EmbeddedBeamInterfaceP();
-    ~EmbeddedBeamInterfaceP();
+        std::vector <double>  solidEta, std::vector <double>  solidZeta, std::vector <double> radius, double beam_radius, double area);
+    EmbeddedBeamToe();
+    ~EmbeddedBeamToe();
 
-    const char *getClassType(void) const { return "EmbeddedBeamInterfaceP"; };
+    const char *getClassType(void) const { return "EmbeddedBeamToe"; };
 
     int getNumExternalNodes(void) const;
     const ID &getExternalNodes(void);
@@ -76,7 +79,7 @@ public:
     // public methods for element output
     int sendSelf(int commitTag, Channel &theChannel);
     int recvSelf(int commitTag, Channel &theChannel, FEM_ObjectBroker
-        &theBroker);
+        &thEBTroker);
     int displaySelf(Renderer &theViewer, int displayMode, float fact, const char **modes, int numMode);
     void Print(OPS_Stream &s, int flag = 0);
 
@@ -92,15 +95,19 @@ protected:
 
 private:
     // private attributes - a copy for each object of the class
-    int EBIP_numNodes, EBIP_numDOF;
+    int EBT_numNodes, EBT_numDOF;
 
     ID externalNodes; // Tags of beam and solid nodes
+
+    Node **theNodes;
 
     int *theSolidTag;
     int *solidNodeTags;
     int theBeamTag;
 
-    Node **theNodes;
+    Element* theBeam;
+
+    SP_Constraint **theConstraints;
 
     Vector		m_InterfaceForces;	// force vector
     Matrix		m_InterfaceStiffness;	// stiffness matrix
@@ -113,31 +120,20 @@ private:
     Vector m_solid_zeta;
     Vector m_beam_rho;
     Vector m_beam_theta;
+    Vector m_beam_r;
+
+    int     m_numSolidNodes, m_numEmbeddedPoints;
 
     // shape functions
     Vector  m_Ns;
     double  m_Hb1, m_Hb2, m_Hb3, m_Hb4, m_Nb1, m_Nb2;
     double  m_dH1, m_dH2, m_dH3, m_dH4;
 
-    double	m_beam_radius;	 // beam Radius
+    double 	m_beam_radius;	 // beam Radius
     double  m_beam_length;   // beam length
-    double	m_ep;		     // penalty parameter
     double  m_area;          // interface element area
 
-    int     m_numSolidNodes, m_numEmbeddedPoints;
-
     CrdTransf* crdTransf;  // pointer to coordinate tranformation object
-
-    double  m_Force;
-    Vector  m_Lambda;
-
-    Vector m_Ba_rot_n, m_Bb_rot_n;
-    Vector m_Ba_disp_n, m_Bb_disp_n;
-    Vector m_Bcl_pos, m_Bcl_pos_n;
-    Vector m_B_loc, m_S_disp;
-    Vector m_Ba1, m_Bb1;
-    Vector m_pos;
-
 
     // copied from BeamContact3D
     double mchi;                // twist rotation from end 1 to end 2
@@ -145,12 +141,13 @@ private:
     Matrix mQb;                 // coordinate transform for node b
     Matrix mQc;
     Vector mc1;                 // tangent vector at project point c
+    Vector m_Ba_rot_n, m_Bb_rot_n;
     Matrix mBphi, mBu, mHf;
-    Matrix mA, mB, mAt, mBt, mAAt, mBBt, mABt;
+    Matrix mA, mB, mB_inv, mKbb;
 
-    void ComputeBphiAndBu(Matrix &Bphi, Matrix &Bu);            // method to compute Bphi and Bu, used in ComputeB and update
-    void ComputeHf(Matrix &Hf, double theta);                   // method to compute Hf
-    void UpdateTransforms(void);                                // method to update Qa, Qb
+    void ComputeBphiAndBu(Matrix &Bphi, Matrix &Bu);            // method to compute Bphi and Bu, used in ComputEBT and update
+    void ComputeHf(Matrix &Hf, double radius, double theta);     // method to compute Hf
+    void UpdateTransforms(void);                                 // method to update Qa, Qb
     void ComputeQc();
     int	 updateShapeFuncs(double xi, double eta, double zeta, double rho);             // method to update shape functions
 

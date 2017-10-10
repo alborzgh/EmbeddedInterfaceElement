@@ -20,9 +20,9 @@
 
 // Written: Alborz Ghofrani, Diego Turello, Pedro Arduino, U.Washington 
 // Created: May 2017
-// Description: This file contains the class definition for EmbeddedBeamInterfaceP.
+// Description: This file contains the class definition for EmbeddedBeamInterfaceAL2.
 
-#include <EmbeddedBeamInterfaceP.h>
+#include <EmbeddedBeamInterfaceAL2.h>
 #include <Node.h>
 #include <Matrix.h>
 #include <Vector.h>
@@ -40,22 +40,22 @@
 #include <cmath>
 #include <NodeIter.h>
 
-static int num_EmbeddedBeamInterfaceP = 0;
+static int num_EmbeddedBeamInterfaceAL2 = 0;
 static const double m_Pi = 3.14159265359;
 
 void *
-OPS_EmbeddedBeamInterfaceP(void)
+OPS_EmbeddedBeamInterfaceAL2(void)
 {
-    if (num_EmbeddedBeamInterfaceP == 0) {
-        num_EmbeddedBeamInterfaceP++;
-        opserr << "EmbeddedBeamInterfaceP element - Written: A.Ghofrani, D.Turello, P.Arduino, U.Washington\n";
+    if (num_EmbeddedBeamInterfaceAL2 == 0) {
+        num_EmbeddedBeamInterfaceAL2++;
+        opserr << "EmbeddedBeamInterfaceAL2 element - Written: A.Ghofrani, D.Turello, P.Arduino, U.Washington\n";
     }
 
     Element *theElement = 0;
 
     int numArgs = OPS_GetNumRemainingInputArgs();
     if (numArgs < 1) {
-        opserr << "Want: EmbeddedBeamInterfaceP tag? \n";
+        opserr << "Want: EmbeddedBeamInterfaceAL2 tag? \n";
         return 0;
     }
 
@@ -63,16 +63,16 @@ OPS_EmbeddedBeamInterfaceP(void)
     int eleTag = 0;
     int numData = 1;
     if (OPS_GetIntInput(&numData, iData) != 0) {
-        opserr << "WARNING invalid integer data: element EmbeddedBeamInterfaceP" << endln;
+        opserr << "WARNING invalid integer data: element EmbeddedBeamInterfaceAL2" << endln;
         return 0;
     }
 
     eleTag = iData[0];
 
-    theElement = new EmbeddedBeamInterfaceP(iData[0]);
+    theElement = new EmbeddedBeamInterfaceAL2(iData[0]);
 
     if (theElement == 0) {
-        opserr << "WARNING could not create element of type EmbeddedBeamInterfaceP\n";
+        opserr << "WARNING could not create element of type EmbeddedBeamInterfaceAL2\n";
         return 0;
     }
 
@@ -80,15 +80,15 @@ OPS_EmbeddedBeamInterfaceP(void)
 }
 
 
-EmbeddedBeamInterfaceP::EmbeddedBeamInterfaceP(int tag) : Element(tag, ELE_TAG_EmbeddedBeamInterfaceP)
+EmbeddedBeamInterfaceAL2::EmbeddedBeamInterfaceAL2(int tag) : Element(tag, ELE_TAG_EmbeddedBeamInterfaceAL2)
 {
 
 }
 
-EmbeddedBeamInterfaceP::EmbeddedBeamInterfaceP(int tag, int beamTag, std::vector <int> solidTag, int crdTransfTag, 
+EmbeddedBeamInterfaceAL2::EmbeddedBeamInterfaceAL2(int tag, int beamTag, std::vector <int> solidTag, int crdTransfTag,
     std::vector <double>  beamRho, std::vector <double>  beamTheta, std::vector <double>  solidXi, std::vector <double>  solidEta,
-    std::vector <double>  solidZeta, double radius, double area): Element(tag, ELE_TAG_EmbeddedBeamInterfaceP),
-    m_beam_radius(radius), m_area(area), m_ep(1.0e13), m_Lambda(12),
+    std::vector <double>  solidZeta, double radius, double area) : Element(tag, ELE_TAG_EmbeddedBeamInterfaceAL2),
+    m_beam_radius(radius), m_area(area), m_ep(1.0e9), m_Lambda(12), m_Lambda_n(12),
     m_Ba_rot_n(3), m_Bb_rot_n(3),
     m_Ba_disp_n(3), m_Bb_disp_n(3),
     m_Ba1(3), m_Bb1(3),
@@ -104,6 +104,20 @@ EmbeddedBeamInterfaceP::EmbeddedBeamInterfaceP(int tag, int beamTag, std::vector
 #else
     extern Domain theDomain;
 #endif
+
+    // create two new nodes
+    // NodeIter& theNodeIter = theDomain.getNodes();
+    // Node * theNode = theNodeIter();
+    // int maxTag = theNode->getTag();
+    // while ((theNode = theNodeIter()) != 0)
+    //     if (maxTag < theNode->getTag())
+    //         maxTag = theNode->getTag();
+    // opserr << "the node tags are " << maxTag + 1 << " and " << maxTag +2 << endln;
+    // theDomain.addNode(new Node(maxTag + 1, 6, 0.0, 0.0, 0.0));
+    // theDomain.addNode(new Node(maxTag + 2, 6, 0.0, 0.0, 0.0));
+
+    //opserr << "node " << maxTag+1 << " : " << theDomain.getNode(maxTag + 1)->getCrds();
+    //opserr << "node " << maxTag+2 << " : " << theDomain.getNode(maxTag + 2)->getCrds();
 
     m_numEmbeddedPoints = solidTag.size();
     theSolidTag   = new int[m_numEmbeddedPoints];
@@ -136,97 +150,107 @@ EmbeddedBeamInterfaceP::EmbeddedBeamInterfaceP(int tag, int beamTag, std::vector
     // opserr << endln;
 
     m_numSolidNodes = (int)uniqueNodeTags.size();
-    EBIP_numNodes = m_numSolidNodes     + 2;
-    EBIP_numDOF   = m_numSolidNodes * 3 + 12;
+    EBIAL2_numNodes = m_numSolidNodes     + 2;
+    EBIAL2_numDOF   = m_numSolidNodes * 3 + 12;
 
     // opserr << m_numSolidNodes << endln;
 
-    externalNodes = ID(EBIP_numNodes);
-    theNodes = new Node*[EBIP_numNodes];
+    externalNodes = ID(EBIAL2_numNodes);
+    theNodes = new Node*[EBIAL2_numNodes];
 
     int count = 0;
     for (std::set <int>::iterator it = uniqueNodeTags.begin(); it != uniqueNodeTags.end(); ++it)
     {
         m_nodeMap[*it] = count;
         externalNodes(count) = *it;
+
+        // opserr << count << " = " << "map(" << *it << ")\n";
+
+        theNodes[count] = theDomain.getNode(*it);
         count++;
     }
 
     theElement = theDomain.getElement(beamTag);
     for (int ii = 0; ii < 2; ii++)
     {
-        externalNodes(count) = theElement->getNodePtrs()[ii]->getTag();
+        Node * thisNode = theElement->getNodePtrs()[ii];
+        theNodes[count] = thisNode;
+        externalNodes(count) = thisNode->getTag();
         count++;
     }
 
-    m_InterfaceForces    = Vector(EBIP_numDOF);
-    m_InterfaceStiffness = Matrix(EBIP_numDOF, EBIP_numDOF);
+    // opserr << externalNodes;
+    // for (int ii = 0; ii < m_numSolidNodes + 4; ii++)
+    // {
+    //     opserr << theNodes[ii]->getTag() << endln;
+    //     opserr << theNodes[ii]->getTrialDisp();
+    // }
 
-    mA = Matrix(3 * m_numSolidNodes, 12);
-    mB = Matrix(12, 12);
-    mAt = Matrix(12, 3 * m_numSolidNodes);
-    mBt = Matrix(12, 12);
+    m_InterfaceForces = Vector(EBIAL2_numDOF);
+    m_InterfaceStiffness = Matrix(EBIAL2_numDOF, EBIAL2_numDOF);
+    mA   = Matrix(3 * m_numSolidNodes, 12);
+    mB   = Matrix(12, 12);
+    mAt  = Matrix (12, 3 * m_numSolidNodes);
+    mBt  = Matrix(12, 12);
     mAAt = Matrix(3 * m_numSolidNodes, 3 * m_numSolidNodes);
     mBBt = Matrix(12, 12);
     mABt = Matrix(3 * m_numSolidNodes, 12);
-    
-
 
     // get the coordinate transformation object
     crdTransf = OPS_GetCrdTransf(crdTransfTag)->getCopy3d();
 
 }
 
-EmbeddedBeamInterfaceP::EmbeddedBeamInterfaceP()
-    : Element(0, ELE_TAG_EmbeddedBeamInterfaceP)
+EmbeddedBeamInterfaceAL2::EmbeddedBeamInterfaceAL2()
+    : Element(0, ELE_TAG_EmbeddedBeamInterfaceAL2)
 {
 
 }
 
-EmbeddedBeamInterfaceP::~EmbeddedBeamInterfaceP()
+EmbeddedBeamInterfaceAL2::~EmbeddedBeamInterfaceAL2()
 {
 
 }
 
 int
-EmbeddedBeamInterfaceP::getNumExternalNodes(void) const
+EmbeddedBeamInterfaceAL2::getNumExternalNodes(void) const
 {
-    return EBIP_numNodes;
+    return EBIAL2_numNodes;
 }
 
 const ID&
-EmbeddedBeamInterfaceP::getExternalNodes(void)
+EmbeddedBeamInterfaceAL2::getExternalNodes(void)
 {
     return externalNodes;
 }
 
 Node **
-EmbeddedBeamInterfaceP::getNodePtrs(void)
+EmbeddedBeamInterfaceAL2::getNodePtrs(void)
 {
     return theNodes;
 }
 
 int
-EmbeddedBeamInterfaceP::getNumDOF(void)
+EmbeddedBeamInterfaceAL2::getNumDOF(void)
 {
-    return EBIP_numDOF;
+    return EBIAL2_numDOF;
 }
 
 int
-EmbeddedBeamInterfaceP::revertToLastCommit(void)
+EmbeddedBeamInterfaceAL2::revertToLastCommit(void)
 {
     return 0;
 }
 
 int
-EmbeddedBeamInterfaceP::revertToStart(void)
+EmbeddedBeamInterfaceAL2::revertToStart(void)
 {
     return 0;
 }
 
 
 const Matrix&
-EmbeddedBeamInterfaceP::getTangentStiff(void)
+EmbeddedBeamInterfaceAL2::getTangentStiff(void)
 {
     m_InterfaceStiffness.Zero();
 
@@ -251,18 +275,18 @@ EmbeddedBeamInterfaceP::getTangentStiff(void)
 }
 
 const Matrix&
-EmbeddedBeamInterfaceP::getInitialStiff(void)
+EmbeddedBeamInterfaceAL2::getInitialStiff(void)
 {
     return this->getTangentStiff();
 }
 
 const Vector&
-EmbeddedBeamInterfaceP::getResistingForce(void)
+EmbeddedBeamInterfaceAL2::getResistingForce(void)
 {
     m_InterfaceForces.Zero();
-    Vector temp2(12), temp(3 * m_numSolidNodes);
+    Vector temp2(12), temp(3*m_numSolidNodes);
 
-    temp = mA * m_Lambda;
+    temp  = mA * m_Lambda;
     temp2 = -1.0 * mB * m_Lambda;
 
     for (int ii = 0; ii < 3 * m_numSolidNodes; ii++)
@@ -274,36 +298,38 @@ EmbeddedBeamInterfaceP::getResistingForce(void)
 }
 
 int
-EmbeddedBeamInterfaceP::sendSelf(int commitTag, Channel &theChannel)
+EmbeddedBeamInterfaceAL2::sendSelf(int commitTag, Channel &theChannel)
 {
     return 0;
 }
 
 int
-EmbeddedBeamInterfaceP::recvSelf(int commitTag, Channel &theChannel, FEM_ObjectBroker
+EmbeddedBeamInterfaceAL2::recvSelf(int commitTag, Channel &theChannel, FEM_ObjectBroker
     &theBroker)
 {
     return 0;
 }
 
 int
-EmbeddedBeamInterfaceP::displaySelf(Renderer &theViewer, int displayMode, float fact, const char **modes, int numMode)
+EmbeddedBeamInterfaceAL2::displaySelf(Renderer &theViewer, int displayMode, float fact, const char **modes, int numMode)
 {
     return 0;
 }
 
 void
-EmbeddedBeamInterfaceP::Print(OPS_Stream &s, int flag)
+EmbeddedBeamInterfaceAL2::Print(OPS_Stream &s, int flag)
 {
     return;
 }
 
 Response*
-EmbeddedBeamInterfaceP::setResponse(const char **argv, int argc,
+EmbeddedBeamInterfaceAL2::setResponse(const char **argv, int argc,
     OPS_Stream &s)
 {
-    if (strcmp(argv[0], "force") == 0 || strcmp(argv[0], "globalForce") == 0) {
-        return new ElementResponse(this, 1, Vector(3 * m_numEmbeddedPoints));
+    // TODO: needs to be updated
+    if (strcmp(argv[0], "locationBeam") == 0 || strcmp(argv[0], "locBeam") == 0)
+    {
+        return new ElementResponse(this, 1, Vector(3));
 
     }
     else if (strcmp(argv[0], "displacement") == 0 || strcmp(argv[0], "disp") == 0)
@@ -311,81 +337,107 @@ EmbeddedBeamInterfaceP::setResponse(const char **argv, int argc,
         return new ElementResponse(this, 2, Vector(3 * m_numEmbeddedPoints));
 
     }
-    else if (strcmp(argv[0], "beamCL") == 0 || strcmp(argv[0], "beamCenterLine") == 0) {
-        return new ElementResponse(this, 3, Vector(3 * m_numEmbeddedPoints));
+    else if (strcmp(argv[0], "beamCL") == 0 || strcmp(argv[0], "beamCenterLine") == 0)
+    {
+        return new ElementResponse(this, 3, Vector(3));
 
     }
-    else if (strcmp(argv[0], "c1") == 0 || strcmp(argv[0], "tangent") == 0) {
-        return new ElementResponse(this, 4, Vector(3 * m_numEmbeddedPoints));
+    else if (strcmp(argv[0], "c1") == 0 || strcmp(argv[0], "tangent") == 0)
+    {
+        return new ElementResponse(this, 4, Vector(3));
 
     }
-    else if (strcmp(argv[0], "c2") == 0 || strcmp(argv[0], "perp2") == 0) {
-        return new ElementResponse(this, 5, Vector(3 * m_numEmbeddedPoints));
+    else if (strcmp(argv[0], "c2") == 0 || strcmp(argv[0], "perp2") == 0)
+    {
+        return new ElementResponse(this, 5, Vector(3));
 
     }
-    else if (strcmp(argv[0], "c3") == 0 || strcmp(argv[0], "perp3") == 0) {
-        return new ElementResponse(this, 6, Vector(3 * m_numEmbeddedPoints));
+    else if (strcmp(argv[0], "c3") == 0 || strcmp(argv[0], "perp3") == 0)
+    {
+        return new ElementResponse(this, 6, Vector(3));
 
     }
-    else {
-        opserr << "EmbeddedBeamInterfaceP Recorder, " << argv[0] << "is an unknown recorder request"
+    else if (strcmp(argv[0], "force") == 0 || strcmp(argv[0], "globalForce") == 0)
+    {
+        return new ElementResponse(this, 7, Vector(3));
+
+    }
+    else
+    {
+        opserr << "EmbeddedBeam Recorder, " << argv[0] << "is an unknown recorder request"
             << "  Element tag : " << this->getTag() << endln;
         return 0;
     }
 }
 
 int
-EmbeddedBeamInterfaceP::getResponse(int responseID, Information &eleInformation)
+EmbeddedBeamInterfaceAL2::getResponse(int responseID, Information &eleInformation)
 {
-    // TODO: Needs to be updated
-    if (responseID == 1) // force
-        return eleInformation.setVector(GetInteractionPtForce());
-    else if (responseID == 2) // displacement
+    // TODO: needs to be updated
+    if (responseID == 1)
+    { // location
+
+        return eleInformation.setVector(Vector(3));
+
+    }
+    else if (responseID == 2)
+    { // location
+
         return eleInformation.setVector(GetInteractionPtDisp());
-    else if (responseID == 3) // centerline
-        return eleInformation.setVector(m_Bcl_pos);
-    else if (responseID == 4) // c1
-    { 
+    }
+    else if (responseID == 3)
+    { // centerline
+
+        return eleInformation.setVector(Vector(3));
+    }
+    else if (responseID == 4)
+    { // c1
         Vector temp(3);
         for (int ii = 0; ii < 3; ii++)
             temp(ii) = mQc(ii, 0);
         return eleInformation.setVector(temp);
     }
-    else if (responseID == 5) // c2
-    { 
+    else if (responseID == 5)
+    { // c2
         Vector temp(3);
         for (int ii = 0; ii < 3; ii++)
             temp(ii) = mQc(ii, 1);
         return eleInformation.setVector(temp);
     }
-    else if (responseID == 6) // c3
-    { 
+    else if (responseID == 6)
+    { // c3
         Vector temp(3);
         for (int ii = 0; ii < 3; ii++)
             temp(ii) = mQc(ii, 2);
         return eleInformation.setVector(temp);
     }
-    else {
-        opserr << "EmbeddedBeamInterfaceP, tag = " << this->getTag()
+    else if (responseID == 7)
+    { // contact force
+        Vector temp(3);
+        return eleInformation.setVector(temp);
+    }
+    else
+    {
+        opserr << "EmbeddedBeam, tag = " << this->getTag()
             << " -- unknown request" << endln;
         return -1;
     }
 }
 
 int
-EmbeddedBeamInterfaceP::setParameter(const char **argv, int argc, Parameter &param)
+EmbeddedBeamInterfaceAL2::setParameter(const char **argv, int argc, Parameter &param)
 {
     return 0;
 }
 
 int
-EmbeddedBeamInterfaceP::updateParameter(int parameterID, Information &info)
+EmbeddedBeamInterfaceAL2::updateParameter(int parameterID, Information &info)
 {
     return 0;
 }
 
 void
-EmbeddedBeamInterfaceP::setDomain(Domain *theDomain)
+EmbeddedBeamInterfaceAL2::setDomain(Domain *theDomain)
 {
     for (int ii = 0; ii < m_numSolidNodes + 2; ii++)
     {
@@ -406,29 +458,27 @@ EmbeddedBeamInterfaceP::setDomain(Domain *theDomain)
             return;
         }
     }
-
+    
     // initialize the transformation
     if (crdTransf->initialize(theNodes[m_numSolidNodes], theNodes[m_numSolidNodes + 1]))
     {
         opserr << "EmbeddedBeamInterfaceAL2::setDomain(): Error initializing coordinate transformation";
         return;
     }
-
+    
     m_beam_length = crdTransf->getInitialLength();
-    if (m_beam_length < 1.0e-12)
-    {
+    if (m_beam_length < 1.0e-12) {
         opserr << "FATAL ERROR EmbeddedBeamInterfaceAL2 (tag: " << this->getTag() << ") : "
             << "Beam element has zero length." << endln;
         return;
     }
-
+    
     Vector initXAxis(3);
     Vector initYAxis(3);
     Vector initZAxis(3);
     crdTransf->getLocalAxes(initXAxis, initYAxis, initZAxis);
     // fill mQa
-    for (int i = 0; i < 3; i++)
-    {
+    for (int i = 0; i < 3; i++) {
         mQa(i, 0) = initXAxis(i);
         mQa(i, 1) = initYAxis(i);
         mQa(i, 2) = initZAxis(i);
@@ -437,7 +487,7 @@ EmbeddedBeamInterfaceP::setDomain(Domain *theDomain)
     // if mQa = mQb -> mchi = 0
     mQc = mQb = mQa;
     mchi = 0;
-
+    
 
     // calculate A and B
     mA.Zero();
@@ -451,27 +501,27 @@ EmbeddedBeamInterfaceP::setDomain(Domain *theDomain)
         ComputeHf(mHf, m_beam_theta(ii));
 
         Element * theElement = theDomain->getElement(theSolidTag[ii]);
-        double oneOver2PiR = 0.5 / m_Pi / m_beam_radius * m_area;
+        double oneOver2PiR  = 0.5 / m_Pi / m_beam_radius * m_area;
         double oneOver2PiR2 = oneOver2PiR / m_beam_radius;
         /*for (int jj = 0; jj < 8; jj++)
         {
-        int nodeInA = m_nodeMap[theElement->getNodePtrs()[jj]->getTag()];
-        mA(3 * nodeInA, 0) += oneOver2PiR * m_Ns(jj)*m_Nb1;
-        mA(3 * nodeInA, 6) += oneOver2PiR * m_Ns(jj)*m_Nb2;
-        mA(3 * nodeInA + 1, 1) += oneOver2PiR * m_Ns(jj)*m_Nb1;
-        mA(3 * nodeInA + 1, 7) += oneOver2PiR * m_Ns(jj)*m_Nb2;
-        mA(3 * nodeInA + 2, 2) += oneOver2PiR * m_Ns(jj)*m_Nb1;
-        mA(3 * nodeInA + 2, 8) += oneOver2PiR * m_Ns(jj)*m_Nb2;
+            int nodeInA = m_nodeMap[theElement->getNodePtrs()[jj]->getTag()];
+            mA(3 * nodeInA, 0) += oneOver2PiR * m_Ns(jj)*m_Nb1;
+            mA(3 * nodeInA, 6) += oneOver2PiR * m_Ns(jj)*m_Nb2;
+            mA(3 * nodeInA + 1, 1) += oneOver2PiR * m_Ns(jj)*m_Nb1;
+            mA(3 * nodeInA + 1, 7) += oneOver2PiR * m_Ns(jj)*m_Nb2;
+            mA(3 * nodeInA + 2, 2) += oneOver2PiR * m_Ns(jj)*m_Nb1;
+            mA(3 * nodeInA + 2, 8) += oneOver2PiR * m_Ns(jj)*m_Nb2;
 
-        mA(3 * nodeInA, 5) += -oneOver2PiR2 * m_Ns(jj) * m_Nb1 * sin(m_beam_theta(ii));
-        mA(3 * nodeInA + 1, 5) += oneOver2PiR2 * m_Ns(jj) * m_Nb1 * cos(m_beam_theta(ii));
-        mA(3 * nodeInA + 2, 3) += 2.0 * oneOver2PiR2 * m_Ns(jj) * m_Nb1 * sin(m_beam_theta(ii));
-        mA(3 * nodeInA + 2, 4) += -2.0 * oneOver2PiR2 * m_Ns(jj) * m_Nb1 * cos(m_beam_theta(ii));
+            mA(3 * nodeInA, 5) += -oneOver2PiR2 * m_Ns(jj) * m_Nb1 * sin(m_beam_theta(ii));
+            mA(3 * nodeInA + 1, 5) += oneOver2PiR2 * m_Ns(jj) * m_Nb1 * cos(m_beam_theta(ii));
+            mA(3 * nodeInA + 2, 3) += 2.0 * oneOver2PiR2 * m_Ns(jj) * m_Nb1 * sin(m_beam_theta(ii));
+            mA(3 * nodeInA + 2, 4) += -2.0 * oneOver2PiR2 * m_Ns(jj) * m_Nb1 * cos(m_beam_theta(ii));
 
-        mA(3 * nodeInA, 11) += -oneOver2PiR2 * m_Ns(jj) * m_Nb2 * sin(m_beam_theta(ii));
-        mA(3 * nodeInA + 1, 11) += oneOver2PiR2 * m_Ns(jj) * m_Nb2 * cos(m_beam_theta(ii));
-        mA(3 * nodeInA + 2, 9) += 2.0 * oneOver2PiR2 * m_Ns(jj) * m_Nb2 * sin(m_beam_theta(ii));
-        mA(3 * nodeInA + 2, 10) += -2.0 * oneOver2PiR2 * m_Ns(jj) * m_Nb2 * cos(m_beam_theta(ii));
+            mA(3 * nodeInA, 11) += -oneOver2PiR2 * m_Ns(jj) * m_Nb2 * sin(m_beam_theta(ii));
+            mA(3 * nodeInA + 1, 11) += oneOver2PiR2 * m_Ns(jj) * m_Nb2 * cos(m_beam_theta(ii));
+            mA(3 * nodeInA + 2, 9) += 2.0 * oneOver2PiR2 * m_Ns(jj) * m_Nb2 * sin(m_beam_theta(ii));
+            mA(3 * nodeInA + 2, 10) += -2.0 * oneOver2PiR2 * m_Ns(jj) * m_Nb2 * cos(m_beam_theta(ii));
 
         }*/
 
@@ -483,7 +533,7 @@ EmbeddedBeamInterfaceP::setDomain(Domain *theDomain)
 
             for (int kk = 0; kk < 12; kk++)
             {
-                mA(3 * nodeInA, kk) += m_Ns(jj) * mHf(0, kk);
+                mA(3 * nodeInA, kk)     += m_Ns(jj) * mHf(0, kk);
                 mA(3 * nodeInA + 1, kk) += m_Ns(jj) * mHf(1, kk);
                 mA(3 * nodeInA + 2, kk) += m_Ns(jj) * mHf(2, kk);
             }
@@ -569,7 +619,7 @@ EmbeddedBeamInterfaceP::setDomain(Domain *theDomain)
 }
 
 int
-EmbeddedBeamInterfaceP::update(void)
+EmbeddedBeamInterfaceAL2::update(void)
 {
     Vector sDisp(3 * m_numSolidNodes), bDisp(12);
     for (int ii = 0; ii < m_numSolidNodes; ii++)
@@ -584,26 +634,31 @@ EmbeddedBeamInterfaceP::update(void)
         bDisp(jj) = theNodes[m_numSolidNodes]->getTrialDisp()(jj);
         bDisp(jj + 6) = theNodes[m_numSolidNodes + 1]->getTrialDisp()(jj);
     }
- 
-    m_Lambda = m_ep * (mAt * sDisp - mBt * bDisp);
+
+    m_Lambda = m_Lambda_n + m_ep * (mAt * sDisp - mBt * bDisp);
 
     return 0;
 }
 
 int
-EmbeddedBeamInterfaceP::commitState(void)
+EmbeddedBeamInterfaceAL2::commitState(void)
 {
     int retVal = 0;
 
+    m_Lambda_n = m_Lambda;
+    
+    if (m_ep < 1.0e12)
+        m_ep *= 10.0;
+
     // call element commitState to do any base class stuff
     if ((retVal = this->Element::commitState()) != 0) {
-        opserr << "EmbeddedBeamInterfaceP::commitState() - failed in base class";
+        opserr << "EmbeddedBeamInterfaceAL2::commitState() - failed in base class";
     }
 
     return retVal;
 }
 
-int EmbeddedBeamInterfaceP::updateShapeFuncs(double xi, double eta, double zeta, double rho)
+int EmbeddedBeamInterfaceAL2::updateShapeFuncs(double xi, double eta, double zeta, double rho)
 {
     if ((xi < -1.0) || (xi > 1.0) || (eta < -1.0) || (eta > 1.0) || (zeta < -1.0) || (zeta > 1.0))
     {
@@ -646,7 +701,7 @@ int EmbeddedBeamInterfaceP::updateShapeFuncs(double xi, double eta, double zeta,
 }
 
 Vector
-EmbeddedBeamInterfaceP::CrossProduct(const Vector &V1, const Vector &V2)
+EmbeddedBeamInterfaceAL2::CrossProduct(const Vector &V1, const Vector &V2)
 {
     Vector V3(3);
 
@@ -658,7 +713,7 @@ EmbeddedBeamInterfaceP::CrossProduct(const Vector &V1, const Vector &V2)
 }
 
 Vector
-EmbeddedBeamInterfaceP::Geta1(void) 
+EmbeddedBeamInterfaceAL2::Geta1(void) 
 {
     Vector a1(3);
     int i;
@@ -671,7 +726,7 @@ EmbeddedBeamInterfaceP::Geta1(void)
 }
 
 Vector
-EmbeddedBeamInterfaceP::Getb1(void) 
+EmbeddedBeamInterfaceAL2::Getb1(void) 
 {
     Vector b1(3);
     int i;
@@ -684,7 +739,7 @@ EmbeddedBeamInterfaceP::Getb1(void)
 }
 
 void
-EmbeddedBeamInterfaceP::Setc1(Vector c1_vec) 
+EmbeddedBeamInterfaceAL2::Setc1(Vector c1_vec) 
 {
     mc1 = c1_vec;
 
@@ -692,13 +747,13 @@ EmbeddedBeamInterfaceP::Setc1(Vector c1_vec)
 }
 
 Vector
-EmbeddedBeamInterfaceP::Getc1(void) {
+EmbeddedBeamInterfaceAL2::Getc1(void) {
     return mc1;
 }
 
 
 Matrix
-EmbeddedBeamInterfaceP::Transpose(int dim1, int dim2, const Matrix &M)
+EmbeddedBeamInterfaceAL2::Transpose(int dim1, int dim2, const Matrix &M)
 {
     // copied from transpose function in Brick.cpp
 
@@ -713,7 +768,7 @@ EmbeddedBeamInterfaceP::Transpose(int dim1, int dim2, const Matrix &M)
 
 
 Matrix
-EmbeddedBeamInterfaceP::ComputeSkew(Vector th)
+EmbeddedBeamInterfaceAL2::ComputeSkew(Vector th)
 {
     Matrix skew_th(3, 3);
 
@@ -731,7 +786,7 @@ EmbeddedBeamInterfaceP::ComputeSkew(Vector th)
 }
 
 void
-EmbeddedBeamInterfaceP::ComputeBphiAndBu(Matrix &Bphi, Matrix &Bu)
+EmbeddedBeamInterfaceAL2::ComputeBphiAndBu(Matrix &Bphi, Matrix &Bu)
 {
     int i, j;
     Matrix dummy1(3, 3);
@@ -857,7 +912,7 @@ EmbeddedBeamInterfaceP::ComputeBphiAndBu(Matrix &Bphi, Matrix &Bu)
     return;
 }
 
-void EmbeddedBeamInterfaceP::ComputeHf(Matrix & Hf, double theta)
+void EmbeddedBeamInterfaceAL2::ComputeHf(Matrix & Hf, double theta)
 {
     Hf.Zero();
     double oneOver2PiR = 0.5 / m_Pi / m_beam_radius * m_area;
@@ -882,7 +937,7 @@ void EmbeddedBeamInterfaceP::ComputeHf(Matrix & Hf, double theta)
 }
 
 void
-EmbeddedBeamInterfaceP::UpdateTransforms(void)
+EmbeddedBeamInterfaceAL2::UpdateTransforms(void)
 {
     Vector temp_a(6);           // trial disp/rot vector at a(total disp/rot)
     Vector temp_b(6);           // trial disp/rot vector at a(total disp/rot) 
@@ -916,7 +971,7 @@ EmbeddedBeamInterfaceP::UpdateTransforms(void)
 }
 
 void
-EmbeddedBeamInterfaceP::ComputeQc()
+EmbeddedBeamInterfaceAL2::ComputeQc()
 {
     Vector c1(3);         // tangent vector at projection point, c
     Vector a1(3);         // tangent vector at a
@@ -958,7 +1013,7 @@ EmbeddedBeamInterfaceP::ComputeQc()
 }
 
 Matrix
-EmbeddedBeamInterfaceP::ExponentialMap(Vector th)
+EmbeddedBeamInterfaceAL2::ExponentialMap(Vector th)
 {
     double theta = th.Norm();             // vector norm
     Matrix sk_theta(3,3);    // skew of vector
@@ -983,7 +1038,47 @@ EmbeddedBeamInterfaceP::ExponentialMap(Vector th)
     return Q;
 }
 
-Vector EmbeddedBeamInterfaceP::GetInteractionPtDisp()
+Vector EmbeddedBeamInterfaceAL2::GetInteractionPtDisp()
+{
+    Vector res(3 * m_numEmbeddedPoints);
+    Vector c2(3), c3(3);
+    Vector bDisp(12);
+    Matrix Hb(3, 12);
+    Vector ptDisp(3);
+
+    // update local coordinate system
+    for (int ii = 0; ii < 3; ii++)
+    {
+        c2(ii) = mQc(ii, 1);
+        c3(ii) = mQc(ii, 2);
+    }
+
+    for (int ii = 0; ii < 6; ii++)
+    {
+        bDisp(ii) = theNodes[m_numSolidNodes]->getTrialDisp()(ii);
+        bDisp(ii + 6) = theNodes[m_numSolidNodes+1]->getTrialDisp()(ii);
+    }
+
+
+    for (int ii = 0; ii < m_numEmbeddedPoints; ii++)
+    {
+        // update the interpolation functions for displacements and interaction forces
+        updateShapeFuncs(m_solid_xi(ii), m_solid_eta(ii), m_solid_zeta(ii), m_beam_rho(ii));
+
+        // update the matrices that define kinematics of the points on the beam surface
+        ComputeBphiAndBu(mBphi, mBu);
+
+        Hb = mBu - (m_beam_radius*(cos(m_beam_theta(ii))*ComputeSkew(c2) + sin(m_beam_theta(ii))*ComputeSkew(c3))) * mBphi;
+        ptDisp = Hb * bDisp;
+
+        for (int jj = 0; jj < 3; jj++)
+            res(3 * ii + jj) = ptDisp(jj);
+    }
+
+    return res;
+}
+
+Vector EmbeddedBeamInterfaceAL2::GetInteractionPtForce()
 {
     Vector res(3 * m_numEmbeddedPoints);
     Vector c2(3), c3(3);
@@ -1018,30 +1113,6 @@ Vector EmbeddedBeamInterfaceP::GetInteractionPtDisp()
 
         for (int jj = 0; jj < 3; jj++)
             res(3 * ii + jj) = ptDisp(jj);
-    }
-
-    return res;
-}
-
-Vector EmbeddedBeamInterfaceP::GetInteractionPtForce()
-{
-    Vector res(3 * m_numEmbeddedPoints);
-    Vector ptForces(3);
-    Matrix Hf(3, 12);
-
-
-    for (int ii = 0; ii < m_numEmbeddedPoints; ii++)
-    {
-        // update the interpolation functions for displacements and interaction forces
-        updateShapeFuncs(m_solid_xi(ii), m_solid_eta(ii), m_solid_zeta(ii), m_beam_rho(ii));
-
-        // update the matrices that define kinematics of the points on the beam surface
-        ComputeHf(Hf, m_beam_theta(ii));
-
-        ptForces = Hf * m_Lambda;
-
-        for (int jj = 0; jj < 3; jj++)
-            res(3 * ii + jj) = ptForces(jj);
     }
 
     return res;

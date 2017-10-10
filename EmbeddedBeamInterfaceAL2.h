@@ -20,10 +20,10 @@
 
 // Written: Alborz Ghofrani, Diego Turello, Pedro Arduino, U.Washington 
 // Created: May 2017
-// Description: This file contains the class definition for EmbeddedBeamInterfaceP.
+// Description: This file contains the class definition for EmbeddedBeamInterfaceAL2.
 
-#ifndef EmbedBeamInterfaceP_h
-#define EmbedBeamInterfaceP_h
+#ifndef EmbedBeamInterfaceAL2_h
+#define EmbedBeamInterfaceAL2_h
 
 #include <Element.h>
 #include <Matrix.h>
@@ -35,24 +35,24 @@
 #include <map>
 
 // number of dimensions
-#define EBIP_NUM_DIM  3
+#define EBIAL2_NUM_DIM  3
 
 class Node;
 class NDMaterial;
 class Response;
 class CrdTransf;
 
-class EmbeddedBeamInterfaceP : public Element
+class EmbeddedBeamInterfaceAL2 : public Element
 {
 public:
-    EmbeddedBeamInterfaceP(int tag);
-    EmbeddedBeamInterfaceP(int tag, int beamTag, std::vector <int> solidTag, int crdTransfTag, 
+    EmbeddedBeamInterfaceAL2(int tag);
+    EmbeddedBeamInterfaceAL2(int tag, int beamTag, std::vector <int> solidTag, int crdTransfTag, 
         std::vector <double>  beamRho, std::vector <double>  beamTheta, std::vector <double>  solidXi,
         std::vector <double>  solidEta, std::vector <double>  solidZeta, double radius, double area);
-    EmbeddedBeamInterfaceP();
-    ~EmbeddedBeamInterfaceP();
+    EmbeddedBeamInterfaceAL2();
+    ~EmbeddedBeamInterfaceAL2();
 
-    const char *getClassType(void) const { return "EmbeddedBeamInterfaceP"; };
+    const char *getClassType(void) const { return "EmbeddedBeamInterfaceAL2"; };
 
     int getNumExternalNodes(void) const;
     const ID &getExternalNodes(void);
@@ -92,7 +92,7 @@ protected:
 
 private:
     // private attributes - a copy for each object of the class
-    int EBIP_numNodes, EBIP_numDOF;
+    int EBIAL2_numNodes, EBIAL2_numDOF;
 
     ID externalNodes; // Tags of beam and solid nodes
 
@@ -130,6 +130,7 @@ private:
 
     double  m_Force;
     Vector  m_Lambda;
+    Vector  m_Lambda_n;
 
     Vector m_Ba_rot_n, m_Bb_rot_n;
     Vector m_Ba_disp_n, m_Bb_disp_n;

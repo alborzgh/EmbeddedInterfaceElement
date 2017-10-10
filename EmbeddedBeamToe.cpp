@@ -20,9 +20,9 @@
 
 // Written: Alborz Ghofrani, Diego Turello, Pedro Arduino, U.Washington 
 // Created: May 2017
-// Description: This file contains the class definition for EmbeddedBeam.
+// Description: This file contains the class definition for EmbeddedBeamToe.
 
-#include <EmbeddedBeam.h>
+#include <EmbeddedBeamToe.h>
 #include <Node.h>
 #include <Matrix.h>
 #include <Vector.h>
@@ -40,24 +40,24 @@
 #include <cmath>
 #include <NodeIter.h>
 
-static int num_EmbeddedBeam = 0;
+static int num_EmbeddedBeamToe = 0;
 static const double m_Pi = 3.14159265359;
 
 void *
-OPS_EmbeddedBeam(void)
+OPS_EmbeddedBeamToe(void)
 {
     // TODO: The OPS_EmbedBeam() needs to be completed
 
-    if (num_EmbeddedBeam == 0) {
-        num_EmbeddedBeam++;
-        opserr << "EmbeddedBeam element - Written: A.Ghofrani, D.Turello, P.Arduino, U.Washington\n";
+    if (num_EmbeddedBeamToe == 0) {
+        num_EmbeddedBeamToe++;
+        opserr << "EmbeddedBeamToe element - Written: A.Ghofrani, D.Turello, P.Arduino, U.Washington\n";
     }
 
     Element *theElement = 0;
 
     int numArgs = OPS_GetNumRemainingInputArgs();
     if (numArgs < 1) {
-        opserr << "Want: EmbeddedBeam tag? \n";
+        opserr << "Want: EmbeddedBeamToe tag? \n";
         return 0;
     }
 
@@ -65,16 +65,16 @@ OPS_EmbeddedBeam(void)
     int eleTag = 0;
     int numData = 1;
     if (OPS_GetIntInput(&numData, iData) != 0) {
-        opserr << "WARNING invalid integer data: element EmbeddedBeam" << endln;
+        opserr << "WARNING invalid integer data: element EmbeddedBeamToe" << endln;
         return 0;
     }
 
     eleTag = iData[0];
 
-    theElement = new EmbeddedBeam(iData[0]);
+    theElement = new EmbeddedBeamToe(iData[0]);
 
     if (theElement == 0) {
-        opserr << "WARNING could not create element of type EmbeddedBeam\n";
+        opserr << "WARNING could not create element of type EmbeddedBeamToe\n";
         return 0;
     }
 
@@ -82,75 +82,64 @@ OPS_EmbeddedBeam(void)
 }
 
 
-EmbeddedBeam::EmbeddedBeam(int tag) : Element(tag, ELE_TAG_EmbeddedBeam)
+EmbeddedBeamToe::EmbeddedBeamToe(int tag) : Element(tag, ELE_TAG_EmbeddedBeamToe)
 {
 
 }
 
-EmbeddedBeam::EmbeddedBeam(int tag, int beamTag, std::vector <int> solidTag, int crdTransfTag,
+EmbeddedBeamToe::EmbeddedBeamToe(int tag, int beamTag, std::vector <int> solidTag, int crdTransfTag,
     std::vector <double>  beamRho, std::vector <double>  beamTheta, std::vector <double>  solidXi, std::vector <double>  solidEta,
-    std::vector <double>  solidZeta, double radius, double area, const std::vector<int>& connectedBeamTags) : Element(tag, ELE_TAG_EmbeddedBeam),
-    m_beam_radius(radius), m_area(area), theBeamTag(beamTag), m_isExternalBeamConnected(false), m_isFirstUpdate(0),
-    m_Ba_rot_n(3), m_Bb_rot_n(3), m_beamDisp(12),
+    std::vector <double>  solidZeta, std::vector <double> radius, double beam_radius, double area) : Element(tag, ELE_TAG_EmbeddedBeamToe),
+    m_beam_radius(beam_radius), m_area(area), theBeamTag(beamTag),
+    m_Ba_rot_n(3), m_Bb_rot_n(3),
     mQa(3, 3), mQb(3, 3), mQc(3, 3), mc1(3),
-    mBphi(3, 12), mBu(3, 12), mHf(3, 12), m_Ns(8)
+    mBphi(3, 6), mBu(3, 6), mHf(3, 6), m_Ns(8)
 {
     // get domain to have access to element tags and their nodes (this cannot be done in setDomain because number of nodes and dof's need to be known.)
-#ifdef _PARALLEL_PROCESSING
-#include <PartitionedDomain.h>
+    #ifdef _PARALLEL_PROCESSING
+    #include <PartitionedDomain.h>
     extern PartitionedDomain theDomain;
-#else
+    #else
     extern Domain theDomain;
-#endif
-
-    // get beam elements connected to this beam
-    m_numConnectedBeams = (int)(connectedBeamTags.size());
-    if (m_numConnectedBeams > 0)
-    {
-        m_isExternalBeamConnected = true;
-        theConnectedBeamTag = new int[m_numConnectedBeams];
-        theConnctedBeamElems = new Element*[m_numConnectedBeams];
-        for (int ii = 0; ii < m_numConnectedBeams; ii++)
-            theConnectedBeamTag[ii] = connectedBeamTags[ii];
-    }
+    #endif
 
     // initialize information for solids in contact
     std::set <int> uniqueNodeTags;
-    m_numEmbeddedPoints = (int)(solidTag.size());
-    theSolidTag = new int[m_numEmbeddedPoints];
-    solidNodeTags = new int[8 * m_numEmbeddedPoints];
-    m_beam_rho = m_beam_theta = m_solid_xi = m_solid_eta = m_solid_zeta = Vector(m_numEmbeddedPoints);
+    m_numEmbeddedPoints = solidTag.size();
+    theSolidTag         = new int[m_numEmbeddedPoints];
+    solidNodeTags       = new int[8 * m_numEmbeddedPoints];
+    m_beam_rho          = m_beam_r = m_beam_theta = m_solid_xi = m_solid_eta = m_solid_zeta = Vector(m_numEmbeddedPoints);
 
-    // update internal variables
     Element *theElement;
     for (int ii = 0; ii < m_numEmbeddedPoints; ii++)
     {
-        theSolidTag[ii] = solidTag[ii];
-        m_solid_xi(ii) = solidXi[ii];
-        m_solid_eta(ii) = solidEta[ii];
-        m_solid_zeta(ii) = solidZeta[ii];
-        m_beam_rho(ii) = beamRho[ii];
-        m_beam_theta(ii) = beamTheta[ii];
+        theSolidTag[ii]     = solidTag[ii];
+        m_solid_xi(ii)      = solidXi[ii];
+        m_solid_eta(ii)     = solidEta[ii];
+        m_solid_zeta(ii)    = solidZeta[ii];
+        m_beam_rho(ii)      = beamRho[ii];
+        m_beam_theta(ii)    = beamTheta[ii];
+        m_beam_r(ii)        = radius[ii];
 
         theElement = theDomain.getElement(solidTag[ii]);
 
-        // opserr << "Point " << ii +1 << " : element " << solidTag[ii] << " at (" << solidXi[ii] << "," << solidEta[ii] << "," << solidZeta[ii] << ") , beam: " << beamTag << " at (" << beamRho[ii] << "," << beamTheta[ii] << ")" << endln;
+        // opserr << "Point " << ii + 1 << " : element " << solidTag[ii] << " at (" << solidXi[ii] << "," << solidEta[ii] << "," << solidZeta[ii] << ") , beam: " << beamTag << " at (" << beamRho[ii] << "," << beamTheta[ii] << ")" << endln;
 
         for (int jj = 0; jj < 8; jj++)
         {
             uniqueNodeTags.insert(theElement->getNodePtrs()[jj]->getTag());
             solidNodeTags[ii * 8 + jj] = theElement->getNodePtrs()[jj]->getTag();
         }
-
+    
     }
 
     // update the number of connected nodes and number of dof's and update the connectivity information
     m_numSolidNodes = (int)uniqueNodeTags.size();
-    EB_numNodes     = m_numSolidNodes;
-    EB_numDOF       = m_numSolidNodes * 3;
+    EBT_numNodes = m_numSolidNodes;
+    EBT_numDOF   = m_numSolidNodes * 3;
 
-    externalNodes = ID(EB_numNodes);
-    theNodes = new Node*[EB_numNodes];
+    externalNodes = ID(EBT_numNodes);
+    theNodes = new Node*[EBT_numNodes];
 
     int count = 0;
     for (std::set <int>::iterator it = uniqueNodeTags.begin(); it != uniqueNodeTags.end(); ++it)
@@ -164,67 +153,65 @@ EmbeddedBeam::EmbeddedBeam(int tag, int beamTag, std::vector <int> solidTag, int
     theBeam = theDomain.getElement(beamTag);
 
     // get the sp-constraints to apply the displacement to the beam nodes
-    if(m_isExternalBeamConnected)
-        theConstraints = new SP_Constraint*[6];
-    else
-        theConstraints = new SP_Constraint*[12];;
+    theConstraints = new SP_Constraint*[6];
 
     // get memory for internal variables
-    m_InterfaceForces = Vector(EB_numDOF);
-    m_InterfaceStiffness = Matrix(EB_numDOF, EB_numDOF);
-    mA = Matrix(3 * m_numSolidNodes, 12);
-    mB = Matrix(12, 12);
-    mB_inv = Matrix(12, 12);
+    m_InterfaceForces    = Vector(EBT_numDOF);
+    m_InterfaceStiffness = Matrix(EBT_numDOF, EBT_numDOF);
+    mA     = Matrix(3*m_numSolidNodes, 6);
+    mB     = Matrix(6, 6);
+    mB_inv = Matrix(6, 6);
+    mKbb   = Matrix(6, 6);
 
     // get the coordinate transformation object
     crdTransf = OPS_GetCrdTransf(crdTransfTag)->getCopy3d();
 
 }
 
-EmbeddedBeam::EmbeddedBeam()
-    : Element(0, ELE_TAG_EmbeddedBeam)
+EmbeddedBeamToe::EmbeddedBeamToe()
+    : Element(0, ELE_TAG_EmbeddedBeamToe)
 {
 
 }
 
-EmbeddedBeam::~EmbeddedBeam()
+EmbeddedBeamToe::~EmbeddedBeamToe()
 {
     // TODO: There are some dybnamically allocated objects that need to be removed
 }
 
 int
-EmbeddedBeam::getNumExternalNodes(void) const
+EmbeddedBeamToe::getNumExternalNodes(void) const
 {
-    return EB_numNodes;
+    return EBT_numNodes;
 }
 
 const ID&
-EmbeddedBeam::getExternalNodes(void)
+EmbeddedBeamToe::getExternalNodes(void)
 {
     return externalNodes;
 }
 
 Node **
-EmbeddedBeam::getNodePtrs(void)
+EmbeddedBeamToe::getNodePtrs(void)
 {
     return theNodes;
 }
 
 int
-EmbeddedBeam::getNumDOF(void)
+EmbeddedBeamToe::getNumDOF(void)
 {
-    return EB_numDOF;
+    return EBT_numDOF;
 }
 
 int
-EmbeddedBeam::revertToLastCommit(void)
+EmbeddedBeamToe::revertToLastCommit(void)
 {
     // TODO: Check if something needs to be done
     return 0;
 }
 
 int
-EmbeddedBeam::revertToStart(void)
+EmbeddedBeamToe::revertToStart(void)
 {
     // TODO: Check if something needs to be done
     return 0;
@@ -232,26 +219,24 @@ EmbeddedBeam::revertToStart(void)
 
 
 const Matrix&
-EmbeddedBeam::getTangentStiff(void)
+EmbeddedBeamToe::getTangentStiff(void)
 {
     return m_InterfaceStiffness;
 }
 
 const Matrix&
-EmbeddedBeam::getInitialStiff(void)
+EmbeddedBeamToe::getInitialStiff(void)
 {
     return this->getTangentStiff();
 }
 
 const Vector&
-EmbeddedBeam::getResistingForce(void)
+EmbeddedBeamToe::getResistingForce(void)
 {
-
-    theBeam->update();
     m_InterfaceForces.Zero();
 
     Vector sDisp(3 * m_numSolidNodes);
-    Vector bForces(12);
+    Vector bForces(6);
 
     // get the solid node displacements
     for (int ii = 0; ii < m_numSolidNodes; ii++)
@@ -263,36 +248,7 @@ EmbeddedBeam::getResistingForce(void)
 
     // get the beam external forces
     for (int ii = 0; ii < 6; ii++)
-    {
-        bForces(ii) = theBeam->getNodePtrs()[0]->getUnbalancedLoad()(ii);
-        bForces(ii + 6) = theBeam->getNodePtrs()[1]->getUnbalancedLoad()(ii);
-    }
-
-    if (m_isExternalBeamConnected)
-    {
-        // Matrix ABinv = mA * mB_inv;
-        // Matrix ABinvT(12, 3 * m_numSolidNodes);
-        // Vector bResForces_temp(12), bResForces(6);
-        // ABinvT = Transpose(3 * m_numSolidNodes, 12, ABinv);
-        // 
-        // bResForces_temp = mKbb * ABinvT * sDisp;
-        // 
-        // for (int ii = 0; ii < 6; ii++)
-        //     bResForces(ii) = bResForces_temp(m_connectedNode * 6 + ii);
-
-        for (int ii = 0; ii < m_numConnectedBeams; ii++)
-            for (int jj = 0; jj < 2; jj++)
-            {
-                if (theConnctedBeamElems[ii]->getNodePtrs()[jj]->getTag() == theBeam->getNodePtrs()[m_connectedNode]->getTag())
-                {
-                    for (int kk = 0; kk < 6; kk++)
-                        bForces(kk + m_connectedNode * 6) -= theConnctedBeamElems[ii]->getResistingForce()(jj * 6 + kk);
-                    // theBeam->getNodePtrs()[m_connectedNode]->addReactionForce(bResForces, 1.0);
-                    break;
-                }
-            }
-    }
-
+        bForces(ii) = theBeam->getResistingForce()(ii);
 
     m_InterfaceForces = (m_InterfaceStiffness * sDisp) - (mA * mB_inv * bForces);
 
@@ -300,35 +256,35 @@ EmbeddedBeam::getResistingForce(void)
 }
 
 int
-EmbeddedBeam::sendSelf(int commitTag, Channel &theChannel)
+EmbeddedBeamToe::sendSelf(int commitTag, Channel &theChannel)
 {
     // TODO: needs to be completed
     return 0;
 }
 
 int
-EmbeddedBeam::recvSelf(int commitTag, Channel &theChannel, FEM_ObjectBroker
-    &theBroker)
+EmbeddedBeamToe::recvSelf(int commitTag, Channel &theChannel, FEM_ObjectBroker
+    &thEBTroker)
 {
     // TODO: needs to be completed
     return 0;
 }
 
 int
-EmbeddedBeam::displaySelf(Renderer &theViewer, int displayMode, float fact, const char **modes, int numMode)
+EmbeddedBeamToe::displaySelf(Renderer &theViewer, int displayMode, float fact, const char **modes, int numMode)
 {
     return 0;
 }
 
 void
-EmbeddedBeam::Print(OPS_Stream &s, int flag)
+EmbeddedBeamToe::Print(OPS_Stream &s, int flag)
 {
     // TODO: needs to be completed
     return;
 }
 
 Response*
-EmbeddedBeam::setResponse(const char **argv, int argc,
+EmbeddedBeamToe::setResponse(const char **argv, int argc,
     OPS_Stream &s)
 {
     // TODO: needs to be updated
@@ -361,14 +317,14 @@ EmbeddedBeam::setResponse(const char **argv, int argc,
 
     }
     else {
-        opserr << "EmbeddedBeam Recorder, " << argv[0] << "is an unknown recorder request"
+        opserr << "EmbeddedBeamToe Recorder, " << argv[0] << "is an unknown recorder request"
             << "  Element tag : " << this->getTag() << endln;
         return 0;
     }
 }
 
 int
-EmbeddedBeam::getResponse(int responseID, Information &eleInformation)
+EmbeddedBeamToe::getResponse(int responseID, Information &eleInformation)
 {
     // TODO: needs to be updated
     if (responseID == 1) { // location
@@ -407,26 +363,26 @@ EmbeddedBeam::getResponse(int responseID, Information &eleInformation)
         return eleInformation.setVector(temp);
     }
     else {
-        opserr << "EmbeddedBeam, tag = " << this->getTag()
+        opserr << "EmbeddedBeamToe, tag = " << this->getTag()
             << " -- unknown request" << endln;
         return -1;
     }
 }
 
 int
-EmbeddedBeam::setParameter(const char **argv, int argc, Parameter &param)
+EmbeddedBeamToe::setParameter(const char **argv, int argc, Parameter &param)
 {
     return 0;
 }
 
 int
-EmbeddedBeam::updateParameter(int parameterID, Information &info)
+EmbeddedBeamToe::updateParameter(int parameterID, Information &info)
 {
     return 0;
 }
 
 void
-EmbeddedBeam::setDomain(Domain *theDomain)
+EmbeddedBeamToe::setDomain(Domain *theDomain)
 {
     // get pointers to the element nodes
     for (int ii = 0; ii < m_numSolidNodes; ii++)
@@ -439,22 +395,8 @@ EmbeddedBeam::setDomain(Domain *theDomain)
         }
     }
 
-    // get connected beams if there are any
-    if (m_isExternalBeamConnected)
-        for (int ii = 0; ii < m_numConnectedBeams; ii++)
-            theConnctedBeamElems[ii] = theDomain->getElement(theConnectedBeamTag[ii]);
-
-    if (m_isExternalBeamConnected)
-        for (int jj = 0; jj < 2; jj++)
-            if (theConnctedBeamElems[0]->getNodePtrs()[jj]->getTag() == theBeam->getNodePtrs()[0]->getTag())
-                m_connectedNode = 0;
-            else if (theConnctedBeamElems[0]->getNodePtrs()[jj]->getTag() == theBeam->getNodePtrs()[1]->getTag())
-                m_connectedNode = 1;
-
     // set the sp constraints
-    if (m_isExternalBeamConnected)
-    {
-        int node_notConnected = (m_connectedNode == 0) ? 1 : 0;
+    for (int ii = 0; ii < 1; ii++)
         for (int jj = 0; jj < 6; jj++)
         {
             // check if an existing SP_COostraint exists for that dof at the node
@@ -465,62 +407,32 @@ EmbeddedBeam::setDomain(Domain *theDomain)
             {
                 int spNodeTag = theExistingSP->getNodeTag();
                 int dof = theExistingSP->getDOF_Number();
-                if (theBeam->getNodePtrs()[node_notConnected]->getTag() == spNodeTag && jj == dof)
+                if (theBeam->getNodePtrs()[ii]->getTag() == spNodeTag && jj == dof)
                 {
                     // set the constraint pointer
                     found = true;
-                    theConstraints[jj] = theExistingSP;
+                    theConstraints[ii * 6 + jj] = theExistingSP;
                 }
             }
             if (!found)
             {
                 // create a new sp constraint and add it to the domain
-                theConstraints[jj] = new SP_Constraint(theBeam->getNodePtrs()[node_notConnected]->getTag(), jj, 1.0, false);
-                theDomain->addSP_Constraint(theConstraints[jj]);
+                theConstraints[ii * 6 + jj] = new SP_Constraint(theBeam->getNodePtrs()[ii]->getTag(), jj, 1.0, false);
+                theDomain->addSP_Constraint(theConstraints[ii * 6 + jj]);
             }
         }
-    }
-    else
-        for (int ii = 0; ii < 2; ii++)
-        {
-            for (int jj = 0; jj < 6; jj++)
-            {
-                // check if an existing SP_COostraint exists for that dof at the node
-                bool found = false;
-                SP_ConstraintIter &theExistingSPs = theDomain->getSPs();
-                SP_Constraint *theExistingSP = 0;
-                while ((found == false) && ((theExistingSP = theExistingSPs()) != 0))
-                {
-                    int spNodeTag = theExistingSP->getNodeTag();
-                    int dof = theExistingSP->getDOF_Number();
-                    if (theBeam->getNodePtrs()[ii]->getTag() == spNodeTag && jj == dof)
-                    {
-                        // set the constraint pointer
-                        found = true;
-                        theConstraints[ii * 6 + jj] = theExistingSP;
-                    }
-                }
-                if (!found)
-                {
-                    // create a new sp constraint and add it to the domain
-                    theConstraints[ii * 6 + jj] = new SP_Constraint(theBeam->getNodePtrs()[ii]->getTag(), jj, 1.0, false);
-                    theDomain->addSP_Constraint(theConstraints[ii * 6 + jj]);
-                    // opserr << "Constraint node = " << theConstraints[ii * 6 + jj]->getNodeTag() << " , dof = " << theConstraints[ii * 6 + jj]->getDOF_Number() << " created." << endln;
-                }
-            }
-        }
-   
+    
     // initialize the transformation
     if (crdTransf->initialize(theBeam->getNodePtrs()[0], theBeam->getNodePtrs()[1]))
     {
-        opserr << "EmbeddedBeam::setDomain(): Error initializing coordinate transformation";
+        opserr << "EmbeddedBeamToe::setDomain(): Error initializing coordinate transformation";
         return;
     }
     
     // check if the beam has zero length
     m_beam_length = crdTransf->getInitialLength();
     if (m_beam_length < 1.0e-12) {
-        opserr << "FATAL ERROR EmbeddedBeam (tag: " << this->getTag() << ") : "
+        opserr << "FATAL ERROR EmbeddedBeamToe (tag: " << this->getTag() << ") : "
             << "Beam element has zero length." << endln;
         return;
     }
@@ -560,7 +472,7 @@ EmbeddedBeam::setDomain(Domain *theDomain)
         // update the interpolation functions for displacements and interaction forces
         updateShapeFuncs(m_solid_xi(ii), m_solid_eta(ii), m_solid_zeta(ii), m_beam_rho(ii));
         mHf.Zero();
-        ComputeHf(mHf, m_beam_theta(ii));
+        ComputeHf(mHf, m_beam_r(ii), m_beam_theta(ii));
 
 
         Element * theElement = theDomain->getElement(theSolidTag[ii]);
@@ -571,7 +483,7 @@ EmbeddedBeam::setDomain(Domain *theDomain)
 
             // opserr << "Element " << theSolidTag[ii] << " - Node " << theElement->getNodePtrs()[jj]->getTag() << " which is " << nodeInA << " in the local Mat." << endln;
 
-            for (int kk = 0; kk < 12; kk++)
+            for (int kk = 0; kk < 6; kk++)
             {
                 mA(3 * nodeInA, kk)     += m_Ns(jj) * mHf(0, kk);
                 mA(3 * nodeInA + 1, kk) += m_Ns(jj) * mHf(1, kk);
@@ -580,13 +492,13 @@ EmbeddedBeam::setDomain(Domain *theDomain)
         }
 
         // update the matrices that define kinematics of the points on the beam surface
-        Matrix Hb(3, 12);
+        Matrix Hb(3, 6);
 
         ComputeBphiAndBu(mBphi, mBu);
         
-        Hb = mBu - (m_beam_radius*(cos(m_beam_theta(ii))*ComputeSkew(c2) + sin(m_beam_theta(ii))*ComputeSkew(c3))) * mBphi;
+        Hb = mBu - (m_beam_r(ii)*(cos(m_beam_theta(ii))*ComputeSkew(c2) + sin(m_beam_theta(ii))*ComputeSkew(c3))) * mBphi;
 
-        Matrix HbT = Transpose(3, 12, Hb);
+        Matrix HbT = Transpose(3, 6, Hb);
         mB += HbT * mHf;
     }
 
@@ -594,67 +506,41 @@ EmbeddedBeam::setDomain(Domain *theDomain)
     mB.Invert(mB_inv);
 
     // get the beam tangent matrix
-    mKbb = theBeam->getTangentStiff();
+    for (int ii = 0; ii < 6; ii++) 
+        for (int jj = 0; jj < 6; jj++) 
+            mKbb(ii,jj) = theBeam->getTangentStiff()(ii,jj);
 
     m_InterfaceStiffness.Zero();
 
     Matrix ABinv = mA * mB_inv;
-    Matrix ABinvT(12, 3 * m_numSolidNodes);
-    ABinvT = Transpose(3 * m_numSolidNodes, 12, ABinv);
+    Matrix ABinvT(6, 3 * m_numSolidNodes);
+    ABinvT = Transpose(3 * m_numSolidNodes, 6, ABinv);
 
     // update the element tangent stiffness matrix
     m_InterfaceStiffness = ABinv * mKbb * ABinvT;
-    
+
     this->DomainComponent::setDomain(theDomain);
     return;
 }
 
 int
-EmbeddedBeam::update(void)
+EmbeddedBeamToe::update(void)
 {
     // TODO: the coordinate systems and kinematics need to be updated for larger deformations
-    // calculate beam displacements
-    Vector sDisp(3 * m_numSolidNodes);
-    for (int ii = 0; ii < m_numSolidNodes; ii++)
-    {
-        sDisp(3 * ii) = theNodes[ii]->getTrialDisp()(0);
-        sDisp(3 * ii + 1) = theNodes[ii]->getTrialDisp()(1);
-        sDisp(3 * ii + 2) = theNodes[ii]->getTrialDisp()(2);
-    }
-
-    Matrix ABinv = mA * mB_inv;
-    Matrix ABinvT(12, 3 * m_numSolidNodes);
-    ABinvT = Transpose(3 * m_numSolidNodes, 12, ABinv);
-
-    m_beamDisp = ABinvT * sDisp;
-    Vector beam_Force(12), beamForce1(6), beamForce2(6);
-    beam_Force = mKbb * m_beamDisp;
-
-    for (int ii = 0; ii < 6; ii++)
-    {
-        theBeam->getNodePtrs()[0]->setTrialDisp(m_beamDisp(ii), ii);
-        theBeam->getNodePtrs()[1]->setTrialDisp(m_beamDisp(ii + 6), ii);
-        beamForce1(ii) = beam_Force(ii);
-        beamForce2(ii) = beam_Force(ii + 6);
-    }
-
-    beamForce1 = beamForce1 - theBeam->getNodePtrs()[0]->getUnbalancedLoad();
-    beamForce2 = beamForce2 - theBeam->getNodePtrs()[1]->getUnbalancedLoad();
-
-    theBeam->getNodePtrs()[0]->addUnbalancedLoad(beamForce1, 1.0);
-    theBeam->getNodePtrs()[1]->addUnbalancedLoad(beamForce2, 1.0);
 
     return 0;
 }
 
 int
-EmbeddedBeam::commitState(void)
+EmbeddedBeamToe::commitState(void)
 {
     int retVal = 0;
 
-    m_isFirstUpdate = 0;
+    // use the sp constraints to push the beam displacements to the beam nodes
+    extern ConstraintHandler *theHandler;  // need to get access to the constraint handler
 
     // calculate beam displacements
+    Vector bDisp(6);
     Vector sDisp(3 * m_numSolidNodes);
     for (int ii = 0; ii < m_numSolidNodes; ii++)
     {
@@ -664,40 +550,28 @@ EmbeddedBeam::commitState(void)
     }
 
     Matrix ABinv = mA * mB_inv;
-    Matrix ABinvT(12, 3 * m_numSolidNodes);
-    ABinvT = Transpose(3 * m_numSolidNodes, 12, ABinv);
+    Matrix ABinvT(6, 3 * m_numSolidNodes);
+    ABinvT = Transpose(3 * m_numSolidNodes, 6, ABinv);
 
-    m_beamDisp = ABinvT * sDisp;
+    bDisp = ABinvT * sDisp;
 
-    // use the sp constraints to push the beam displacements to the beam nodes
-    extern ConstraintHandler *theHandler;  // need to get access to the constraint handler
-
-    m_isFirstUpdate = 0;
-    if (m_isExternalBeamConnected)
-        for (int ii = 0; ii < 6; ii++)
-            theConstraints[ii]->applyConstraint(m_beamDisp(m_connectedNode * 6 + ii));
-    else
-        for (int ii = 0; ii < 12; ii++)
-            theConstraints[ii]->applyConstraint(m_beamDisp(ii));
+    // update the sp constraints
+    for (int ii = 0; ii < 6; ii++)
+        theConstraints[ii]->applyConstraint(bDisp(ii));
 
     // need to let the constraint handler know about the update
-    // if (!(theHandler == NULL))
-    //     theHandler->applyLoad();
-    /*if (m_isExternalBeamConnected)
-    {
-        opserr << bDisp;
-        opserr << theBeam->getNodePtrs()[m_connectedNode]->getTrialDisp();
-    }*/
+    if (!(theHandler == NULL))
+        theHandler->applyLoad();
 
     // call element commitState to do any base class stuff
     if ((retVal = this->Element::commitState()) != 0) {
-        opserr << "EmbeddedBeam::commitState() - failed in base class";
+        opserr << "EmbeddedBeamToe::commitState() - failed in base class";
     }
 
     return retVal;
 }
 
-int EmbeddedBeam::updateShapeFuncs(double xi, double eta, double zeta, double rho)
+int EmbeddedBeamToe::updateShapeFuncs(double xi, double eta, double zeta, double rho)
 {
     if ((xi < -1.0) || (xi > 1.0) || (eta < -1.0) || (eta > 1.0) || (zeta < -1.0) || (zeta > 1.0))
     {
@@ -740,7 +614,7 @@ int EmbeddedBeam::updateShapeFuncs(double xi, double eta, double zeta, double rh
 }
 
 Vector
-EmbeddedBeam::CrossProduct(const Vector &V1, const Vector &V2)
+EmbeddedBeamToe::CrossProduct(const Vector &V1, const Vector &V2)
 {
     Vector V3(3);
 
@@ -752,7 +626,7 @@ EmbeddedBeam::CrossProduct(const Vector &V1, const Vector &V2)
 }
 
 Vector
-EmbeddedBeam::Geta1(void) 
+EmbeddedBeamToe::Geta1(void) 
 {
     Vector a1(3);
     int i;
@@ -765,7 +639,7 @@ EmbeddedBeam::Geta1(void)
 }
 
 Vector
-EmbeddedBeam::Getb1(void) 
+EmbeddedBeamToe::Getb1(void) 
 {
     Vector b1(3);
     int i;
@@ -778,7 +652,7 @@ EmbeddedBeam::Getb1(void)
 }
 
 void
-EmbeddedBeam::Setc1(Vector c1_vec) 
+EmbeddedBeamToe::Setc1(Vector c1_vec) 
 {
     mc1 = c1_vec;
 
@@ -786,16 +660,16 @@ EmbeddedBeam::Setc1(Vector c1_vec)
 }
 
 Vector
-EmbeddedBeam::Getc1(void) {
+EmbeddedBeamToe::Getc1(void) {
     return mc1;
 }
 
-Vector EmbeddedBeam::GetInteractionPtDisp()
+Vector EmbeddedBeamToe::GetInteractionPtDisp()
 {
     Vector res(3 * m_numEmbeddedPoints);
     Vector c2(3), c3(3);
-    Vector bDisp(12);
-    Matrix Hb(3, 12);
+    Vector bDisp(6);
+    Matrix Hb(3, 6);
     Vector ptDisp(3);
 
     // update local coordinate system
@@ -806,10 +680,7 @@ Vector EmbeddedBeam::GetInteractionPtDisp()
     }
 
     for (int ii = 0; ii < 6; ii++)
-    {
         bDisp(ii)     = theBeam->getNodePtrs()[0]->getTrialDisp()(ii);
-        bDisp(ii + 6) = theBeam->getNodePtrs()[1]->getTrialDisp()(ii);
-    }
 
 
     for (int ii = 0; ii < m_numEmbeddedPoints; ii++)
@@ -820,7 +691,7 @@ Vector EmbeddedBeam::GetInteractionPtDisp()
         // update the matrices that define kinematics of the points on the beam surface
         ComputeBphiAndBu(mBphi, mBu);
 
-        Hb = mBu - (m_beam_radius*(cos(m_beam_theta(ii))*ComputeSkew(c2) + sin(m_beam_theta(ii))*ComputeSkew(c3))) * mBphi;
+        Hb = mBu - (m_beam_r(ii)*(cos(m_beam_theta(ii))*ComputeSkew(c2) + sin(m_beam_theta(ii))*ComputeSkew(c3))) * mBphi;
         ptDisp = Hb * bDisp;
 
         for (int jj = 0; jj < 3; jj++)
@@ -830,12 +701,12 @@ Vector EmbeddedBeam::GetInteractionPtDisp()
     return res;
 }
 
-Vector EmbeddedBeam::GetInteractionPtForce()
+Vector EmbeddedBeamToe::GetInteractionPtForce()
 {
     Vector res(3 * m_numEmbeddedPoints);
     Vector c2(3), c3(3);
-    Vector bDisp(12);
-    Matrix Hb(3, 12);
+    Vector bDisp(6);
+    Matrix Hb(3, 6);
     Vector ptDisp(3);
 
     // update local coordinate system
@@ -846,10 +717,7 @@ Vector EmbeddedBeam::GetInteractionPtForce()
     }
 
     for (int ii = 0; ii < 6; ii++)
-    {
         bDisp(ii) = theBeam->getNodePtrs()[0]->getTrialDisp()(ii);
-        bDisp(ii + 6) = theBeam->getNodePtrs()[1]->getTrialDisp()(ii);
-    }
 
 
     for (int ii = 0; ii < m_numEmbeddedPoints; ii++)
@@ -860,7 +728,7 @@ Vector EmbeddedBeam::GetInteractionPtForce()
         // update the matrices that define kinematics of the points on the beam surface
         ComputeBphiAndBu(mBphi, mBu);
 
-        Hb = mBu - (m_beam_radius*(cos(m_beam_theta(ii))*ComputeSkew(c2) + sin(m_beam_theta(ii))*ComputeSkew(c3))) * mBphi;
+        Hb = mBu - (m_beam_r(ii)*(cos(m_beam_theta(ii))*ComputeSkew(c2) + sin(m_beam_theta(ii))*ComputeSkew(c3))) * mBphi;
         ptDisp = Hb * bDisp;
 
         for (int jj = 0; jj < 3; jj++)
@@ -872,7 +740,7 @@ Vector EmbeddedBeam::GetInteractionPtForce()
 
 
 Matrix
-EmbeddedBeam::Transpose(int dim1, int dim2, const Matrix &M)
+EmbeddedBeamToe::Transpose(int dim1, int dim2, const Matrix &M)
 {
     // copied from transpose function in Brick.cpp
 
@@ -887,7 +755,7 @@ EmbeddedBeam::Transpose(int dim1, int dim2, const Matrix &M)
 
 
 Matrix
-EmbeddedBeam::ComputeSkew(Vector th)
+EmbeddedBeamToe::ComputeSkew(Vector th)
 {
     Matrix skew_th(3, 3);
 
@@ -905,7 +773,7 @@ EmbeddedBeam::ComputeSkew(Vector th)
 }
 
 void
-EmbeddedBeam::ComputeBphiAndBu(Matrix &Bphi, Matrix &Bu)
+EmbeddedBeamToe::ComputeBphiAndBu(Matrix &Bphi, Matrix &Bu)
 {
     int i, j;
     Matrix dummy1(3, 3);
@@ -977,78 +845,23 @@ EmbeddedBeam::ComputeBphiAndBu(Matrix &Bphi, Matrix &Bu)
         for (j = 0; j < 3; j++)
             Bu(i, 3 + j) = -m_Hb2 * dummy3(i, j);
 
-    // Reuse dummy1 and Compute Bphi(0:2, 6:8) and Bu(0:2, 9:11)
-    dummy2.Zero();
-    dummy3.Zero();
-
-    // dummy2 = Qb^T
-    dummy2 = Transpose(3, 3, mQb);
-    // dummy3 = Qc*E^R*P1*Qb^T
-    dummy3 = dummy1*dummy2;
-    // Compute Bphi(0:2, 6 : 8)
-    for (i = 0; i < 3; i++)
-        for (j = 0; j < 3; j++)
-            Bphi(i, 6 + j) = m_dH3 / L * dummy3(i, j);
-    // Compute Bu(0:2, 9:11)
-    for (i = 0; i < 3; i++)
-        for (j = 0; j < 3; j++)
-            Bu(i, 9 + j) = -m_Hb4 * dummy3(i, j);
-
-    // Reuse dummy2 and Compute Bphi(0:2, 9:11)
-    dummy1.Zero();
-    dummy3.Zero();
-    // dummy1 = N2 * Qc*(E1 dyadic E1)
-    dummy1(0, 0) = m_Nb2*mQc(0, 0);  // N2 * mQc(0:2,0)
-    dummy1(1, 0) = m_Nb2*mQc(1, 0);
-    dummy1(2, 0) = m_Nb2*mQc(2, 0);
-    // dummy1 += dH4 * Qc*P1
-    dummy1(0, 1) = m_dH4*mQc(0, 1)/L;     // dH4 * mQc(0:2,1:2)
-    dummy1(1, 1) = m_dH4*mQc(1, 1)/L;
-    dummy1(2, 1) = m_dH4*mQc(2, 1)/L;
-    dummy1(0, 2) = m_dH4*mQc(0, 2)/L;
-    dummy1(1, 2) = m_dH4*mQc(1, 2)/L;
-    dummy1(2, 2) = m_dH4*mQc(2, 2)/L;
-    // dummy3 = Qc * (N2*(E1 dyadic E1)+ dH4 * P1) * Qb^T
-    dummy3 = dummy1*dummy2;
-    for (i = 0; i < 3; i++)
-        for (j = 0; j < 3; j++) 
-            Bphi(i, 9 + j) = dummy3(i, j);
-
-    // Reuse parts of dummy1 and dummy2 to calculate Bu(0:2,6:8)
-    // dummy1 += dH4 * Qc*P1
-    dummy1(0, 1) = m_Hb3*mQc(0, 1);     // H3 * mQc(0:2,1:2)
-    dummy1(1, 1) = m_Hb3*mQc(1, 1);
-    dummy1(2, 1) = m_Hb3*mQc(2, 1);
-    dummy1(0, 2) = m_Hb3*mQc(0, 2);
-    dummy1(1, 2) = m_Hb3*mQc(1, 2);
-    dummy1(2, 2) = m_Hb3*mQc(2, 2);
-    // dummy3 = Qc * (N2*(E1 dyadic E1)+ H3 * P1) * Qb^T
-    dummy3 = dummy1*dummy2;
-    for (i = 0; i < 3; i++)
-        for (j = 0; j < 3; j++)
-            Bu(i, 6 + j) = dummy3(i, j);
-
     return;
 }
 
-void EmbeddedBeam::ComputeHf(Matrix & Hf, double theta)
+void EmbeddedBeamToe::ComputeHf(Matrix & Hf, double radius, double theta)
 {
     Hf.Zero();
-    double oneOver2PiR = 0.5 / m_Pi / m_beam_radius * m_area;
-    double oneOver2PiR2 = oneOver2PiR / m_beam_radius;
+    double piR2 = m_Pi * m_beam_radius * m_beam_radius;
+    double oneOverPiR2 = 1.0 / piR2 * m_area;
+    double oneOverPiR4 = m_Pi * oneOverPiR2 / piR2;
     for (int ii = 0; ii < 3; ii++)
     {
         for (int jj = 0; jj < 3; jj++)
-        {
-            Hf(ii, jj)     = oneOver2PiR * m_Nb1 * mQa(jj, ii);
-            Hf(ii, jj + 6) = oneOver2PiR * m_Nb2 * mQb(jj, ii);
-        }
-        Hf(0, ii + 3)  = 2.0 * oneOver2PiR2 * m_Nb1 * (mQa(ii, 1) * sin(theta) - mQa(ii, 2) * cos(theta));
-        Hf(1, ii + 3)  = -oneOver2PiR2 * mQa(ii, 0) * m_Nb1 * sin(theta);
-        Hf(2, ii + 3)  =  oneOver2PiR2 * mQa(ii, 0) * m_Nb1 * cos(theta);
-        Hf(0, ii + 9)  = 2.0 * oneOver2PiR2 * m_Nb2 * (mQb(ii, 1) * sin(theta) - mQb(ii, 2) * cos(theta));
-        Hf(1, ii + 9)  = -oneOver2PiR2 * mQb(ii, 0) * m_Nb2 * sin(theta);
-        Hf(2, ii + 9)  =  oneOver2PiR2 * mQb(ii, 0) * m_Nb2 * cos(theta);
+            Hf(ii, jj)     = oneOverPiR2 * m_Nb1 * mQa(jj, ii);
+
+        Hf(0, ii + 3)  =  4.0 * oneOverPiR4 * m_Nb1 * radius * (mQa(ii, 1) * sin(theta) - mQa(ii, 2) * cos(theta));
+        Hf(1, ii + 3)  = -2.0 * oneOverPiR4 * mQa(ii, 0) * m_Nb1 * radius * sin(theta);
+        Hf(2, ii + 3)  =  2.0 * oneOverPiR4 * mQa(ii, 0) * m_Nb1 * radius * cos(theta);
     }
     
     Hf = mQc * Hf;
@@ -1056,7 +869,7 @@ void EmbeddedBeam::ComputeHf(Matrix & Hf, double theta)
 }
 
 void
-EmbeddedBeam::UpdateTransforms(void)
+EmbeddedBeamToe::UpdateTransforms(void)
 {
     Vector temp_a(6);           // trial disp/rot vector at a(total disp/rot)
     Vector temp_b(6);           // trial disp/rot vector at a(total disp/rot) 
@@ -1090,7 +903,7 @@ EmbeddedBeam::UpdateTransforms(void)
 }
 
 void
-EmbeddedBeam::ComputeQc()
+EmbeddedBeamToe::ComputeQc()
 {
     Vector c1(3);         // tangent vector at projection point, c
     Vector a1(3);         // tangent vector at a
@@ -1132,7 +945,7 @@ EmbeddedBeam::ComputeQc()
 }
 
 Matrix
-EmbeddedBeam::ExponentialMap(Vector th)
+EmbeddedBeamToe::ExponentialMap(Vector th)
 {
     double theta = th.Norm();             // vector norm
     Matrix sk_theta(3,3);    // skew of vector

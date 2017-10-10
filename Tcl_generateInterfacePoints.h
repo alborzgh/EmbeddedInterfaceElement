@@ -15,8 +15,14 @@
 #include <EmbeddedBeamInterface.h>
 #include <EmbeddedBeamInterfaceL.h>
 #include <EmbeddedBeamInterfaceP.h>
+#include <EmbeddedBeamInterfaceP2.h>
 #include <EmbeddedBeamInterfaceAL.h>
+#include <EmbeddedBeamInterfaceAL2.h>
+#include <EmbeddedBeamContact.h>
 #include <EmbeddedBeam.h>
+#include <EmbeddedEPBeamInterface.h>
+#include <EmbeddedBeamToe.h>
+#include <EmbeddedBeamToeP.h>
 
 const double PI = 3.14159265359;
 

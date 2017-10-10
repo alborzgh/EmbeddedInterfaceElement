@@ -696,6 +696,12 @@
 #define ELE_TAG_EmbeddedBeamInterfaceAL   178   //Alborz Ghofrani [UW]
 #define ELE_TAG_EmbeddedBeamInterfaceP    179   //Alborz Ghofrani [UW]
 #define ELE_TAG_EmbeddedBeam              180   //Alborz Ghofrani [UW]
+#define ELE_TAG_EmbeddedBeamToe           181   //Alborz Ghofrani [UW]
+#define ELE_TAG_EmbeddedBeamInterfaceP2   182   //Alborz Ghofrani [UW]
+#define ELE_TAG_EmbeddedBeamInterfaceAL2  183   //Alborz Ghofrani [UW]
+#define ELE_TAG_EmbeddedEPBeamInterface   184   //Alborz Ghofrani [UW]
+#define ELE_TAG_EmbeddedBeamContact       185   //Alborz Ghofrani [UW]
+#define ELE_TAG_EmbeddedBeamToeP          186   //Alborz Ghofrani [UW]
 
 #define FRN_TAG_Coulomb            1
 #define FRN_TAG_VelDependent       2

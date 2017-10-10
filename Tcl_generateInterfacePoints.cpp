@@ -39,20 +39,24 @@ TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, in
     int nP        = 100;
     int nL        = 20;
     int shape     = 1;
+    int matTag    = 0;
 
-    bool radiusSet     = false;
-    bool nPset         = false;
-    bool nLset         = false;
-    bool readingEleTag = false;
-    bool shapeSet      = false;
-    bool eleSetDefined = false;
-    bool debugFlag     = false;
-    bool writeCoords   = false;
+    bool radiusSet         = false;
+    bool nPset             = false;
+    bool nLset             = false;
+    bool readingEleTag     = false;
+    bool shapeSet          = false;
+    bool eleSetDefined     = false;
+    bool debugFlag         = false;
+    bool writeCoords       = false;
+    bool beamConnected     = false;
+    bool readingBeamEleTag = false;
 
-    int  lagrangeTag   = 3; // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange
+    int  lagrangeTag   = 3; // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange, 4 = global penalty
 
     const char * crdsFN;
     std::vector <int> eleTags;
+    std::vector <int> connectedBeamsTags;
     std::vector <int> eleTagsInContact;
     std::vector <double> contactPt_xi;
     std::vector <double> contactPt_eta;
@@ -82,6 +86,7 @@ TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, in
         if ((strcmp(argv[curArgPos], "-shape") == 0) && numArgsRemaining >= 2)
         {
             readingEleTag = false;
+            readingBeamEleTag = false;
             numArgsRemaining--; curArgPos++;
             if (strcmp(argv[curArgPos], "circle") == 0)
             {
@@ -119,6 +124,7 @@ TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, in
         else if ((strcmp(argv[curArgPos], "-radius") == 0) && numArgsRemaining >= 2)
         {
             readingEleTag = false;
+            readingBeamEleTag = false;
             radiusSet = true;
             numArgsRemaining--; curArgPos++;
             radius = strtod(argv[curArgPos], NULL);
@@ -127,6 +133,7 @@ TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, in
         else if ((strcmp(argv[curArgPos], "-nP") == 0) && numArgsRemaining >= 2)
         {
             readingEleTag = false;
+            readingBeamEleTag = false;
             nPset = true;
             numArgsRemaining--; curArgPos++;
             nP = strtol(argv[curArgPos], NULL, 10);
@@ -135,6 +142,7 @@ TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, in
         else if ((strcmp(argv[curArgPos], "-nL") == 0) && numArgsRemaining >= 2)
         {
             readingEleTag = false;
+            readingBeamEleTag = false;
             nLset = true;
             numArgsRemaining--; curArgPos++;
             nL = strtol(argv[curArgPos], NULL, 10);
@@ -143,14 +151,25 @@ TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, in
         else if ((strcmp(argv[curArgPos], "-ele") == 0) && numArgsRemaining >= 2)
         {
             readingEleTag = true;
+            readingBeamEleTag = false;
             eleSetDefined = true;
             numArgsRemaining--; curArgPos++;
             eleTags.push_back(strtol(argv[curArgPos], NULL, 10));
             numArgsRemaining--; curArgPos++;
         }
+        else if ((strcmp(argv[curArgPos], "-connectedBeams") == 0) && numArgsRemaining >= 2)
+        {
+            readingEleTag     = false;
+            readingBeamEleTag = true;
+            beamConnected     = true;
+            numArgsRemaining--; curArgPos++;
+            connectedBeamsTags.push_back(strtol(argv[curArgPos], NULL, 10));
+            numArgsRemaining--; curArgPos++;
+        }
         else if ((strcmp(argv[curArgPos], "-eleRange") == 0) && numArgsRemaining >= 3)
         {
             readingEleTag = false;
+            readingBeamEleTag = false;
             eleSetDefined = true;
             numArgsRemaining--; curArgPos++;
             int startEle = strtol(argv[curArgPos], NULL, 10);
@@ -164,6 +183,7 @@ TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, in
         else if ((strcmp(argv[curArgPos], "-file") == 0) && numArgsRemaining >= 2)
         {
             readingEleTag = false;
+            readingBeamEleTag = false;
             writeCoords = true;
             numArgsRemaining--; curArgPos++;
             crdsFN = argv[curArgPos];
@@ -172,35 +192,85 @@ TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, in
         else if (strcmp(argv[curArgPos], "-penalty") == 0)
         {
             readingEleTag = false;
-            // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange
+            readingBeamEleTag = false;
+            // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange, 4 = global penalty
             lagrangeTag = 0;
             numArgsRemaining--; curArgPos++;
         }
         else if (strcmp(argv[curArgPos], "-AL") == 0)
         {
             readingEleTag = false;
-            // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange
+            readingBeamEleTag = false;
+            // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange, 4 = global penalty
             lagrangeTag = 1;
             numArgsRemaining--; curArgPos++;
         }
         else if (strcmp(argv[curArgPos], "-lagrange") == 0)
         {
             readingEleTag = false;
-            // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange
+            readingBeamEleTag = false;
+            // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange, 4 = global penalty
             lagrangeTag = 2;
             numArgsRemaining--; curArgPos++;
         }
         else if (strcmp(argv[curArgPos], "-embed") == 0)
         {
             readingEleTag = false;
-            // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange
+            readingBeamEleTag = false;
+            // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange, 4 = global penalty
             lagrangeTag = 3;
+            numArgsRemaining--; curArgPos++;
+        }
+        else if (strcmp(argv[curArgPos], "-gPenalty") == 0)
+        {
+            readingEleTag = false;
+            readingBeamEleTag = false;
+            // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange, 4 = global penalty
+            lagrangeTag = 4;
+            numArgsRemaining--; curArgPos++;
+        }
+        else if (strcmp(argv[curArgPos], "-gAL") == 0)
+        {
+            readingEleTag = false;
+            readingBeamEleTag = false;
+            // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange, 4 = global penalty
+            lagrangeTag = 5;
+            numArgsRemaining--; curArgPos++;
+        }
+        else if (strcmp(argv[curArgPos], "-contact") == 0)
+        {
+            readingEleTag = false;
+            readingBeamEleTag = false;
+            // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange, 4 = global penalty
+            lagrangeTag = -1;
+            numArgsRemaining--; curArgPos++;
+        }
+        else if (strcmp(argv[curArgPos], "-ElastoPlastic") == 0)
+        {
+            readingEleTag = false;
+            readingBeamEleTag = false;
+            // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange, 4 = global penalty
+            lagrangeTag = 6;
+            numArgsRemaining--; curArgPos++;
+        }
+        else if ((strcmp(argv[curArgPos], "-mat") == 0) && (numArgsRemaining >= 2))
+        {
+            readingEleTag = false;
+            readingBeamEleTag = false;
+            numArgsRemaining--; curArgPos++;
+            matTag = strtol(argv[curArgPos], NULL, 10);
             numArgsRemaining--; curArgPos++;
         }
         else {
             if (readingEleTag)
             {
                 eleTags.push_back(strtol(argv[curArgPos], NULL, 10));
+                numArgsRemaining--; curArgPos++;
+                continue;
+            }
+            else if (readingBeamEleTag)
+            {
+                connectedBeamsTags.push_back(strtol(argv[curArgPos], NULL, 10));
                 numArgsRemaining--; curArgPos++;
                 continue;
             }
@@ -385,6 +455,8 @@ TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, in
 
                 eleTagsInContact_unique.insert(eleTags[ii]);
 
+                maxTag++;
+
                 if (lagrangeTag > 1)
                 {
                     eleTagsInContact.push_back(eleTags[ii]);
@@ -396,12 +468,13 @@ TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, in
                 }
                 else
                 {
-                    maxTag++;
                     // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange
                     if (lagrangeTag == 0)
                         theElement = new EmbeddedBeamInterface(maxTag, beamTag, eleTags[ii], transfTag, loc_rho(jj), loc_theta(jj), xi, eta, zeta, radius, area);
                     else if (lagrangeTag == 1)
                         theElement = new EmbeddedBeamInterfaceAL(maxTag, beamTag, eleTags[ii], transfTag, loc_rho(jj), loc_theta(jj), xi, eta, zeta, radius, area);
+                    if (lagrangeTag == -1)
+                        theElement = new EmbeddedBeamContact(maxTag, beamTag, eleTags[ii], transfTag, loc_rho(jj), loc_theta(jj), xi, eta, zeta, radius, area);
 
                     char buffer[40];
                     sprintf(buffer, "%10i", maxTag);
@@ -432,13 +505,19 @@ TclCommand_GenerateInterfacePoints(ClientData clientData, Tcl_Interp *interp, in
     // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange
     if (lagrangeTag > 1)
     {
-        maxTag++;
         if (lagrangeTag == 2)
             theElement = new EmbeddedBeamInterfaceL(maxTag, beamTag, eleTagsInContact, transfTag, contactPt_rho, contactPt_theta, contactPt_xi, contactPt_eta, contactPt_zeta, radius, area);
         else if (lagrangeTag == 3)
-            theElement = new EmbeddedBeam(maxTag, beamTag, eleTagsInContact, transfTag, contactPt_rho, contactPt_theta, contactPt_xi, contactPt_eta, contactPt_zeta, radius, area);
+            if (beamConnected)
+                theElement = new EmbeddedBeam(maxTag, beamTag, eleTagsInContact, transfTag, contactPt_rho, contactPt_theta, contactPt_xi, contactPt_eta, contactPt_zeta, radius, area, connectedBeamsTags);
+            else
+                theElement = new EmbeddedBeam(maxTag, beamTag, eleTagsInContact, transfTag, contactPt_rho, contactPt_theta, contactPt_xi, contactPt_eta, contactPt_zeta, radius, area);
         else if (lagrangeTag == 4)
             theElement = new EmbeddedBeamInterfaceP(maxTag, beamTag, eleTagsInContact, transfTag, contactPt_rho, contactPt_theta, contactPt_xi, contactPt_eta, contactPt_zeta, radius, area);
+        else if (lagrangeTag == 5)
+            theElement = new EmbeddedBeamInterfaceAL2(maxTag, beamTag, eleTagsInContact, transfTag, contactPt_rho, contactPt_theta, contactPt_xi, contactPt_eta, contactPt_zeta, radius, area);
+        else if (lagrangeTag == 6)
+            theElement = new EmbeddedEPBeamInterface(maxTag, beamTag, eleTagsInContact, transfTag, matTag, contactPt_rho, contactPt_theta, contactPt_xi, contactPt_eta, contactPt_zeta, radius, area);
 
         char buffer[40];
         sprintf(buffer, "%10i", maxTag);
@@ -542,10 +621,18 @@ TclCommand_GenerateToeInterfacePoints(ClientData clientData, Tcl_Interp *interp,
     bool shapeSet      = false;
     bool eleSetDefined = false;
     bool debugFlag     = false;
-    bool writeCoords = false;
+    bool writeCoords   = false;
+    int  lagrangeTag   = 3; // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange
 
     const char * crdsFN;
     std::vector <int> eleTags;
+    std::vector <int> eleTagsInContact;
+    std::vector <double> contactPt_xi;
+    std::vector <double> contactPt_eta;
+    std::vector <double> contactPt_zeta;
+    std::vector <double> contactPt_rho;
+    std::vector <double> contactPt_theta;
+    std::vector <double> contactPt_radius;
     std::set    <int> eleTagsInContact_unique;
 
     int transfTag = 1;
@@ -659,6 +746,34 @@ TclCommand_GenerateToeInterfacePoints(ClientData clientData, Tcl_Interp *interp,
             crdsFN = argv[curArgPos];
             numArgsRemaining--; curArgPos++;
         }
+        else if (strcmp(argv[curArgPos], "-penalty") == 0)
+        {
+            readingEleTag = false;
+            // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange
+            lagrangeTag = 0;
+            numArgsRemaining--; curArgPos++;
+        }
+        else if (strcmp(argv[curArgPos], "-AL") == 0)
+        {
+            readingEleTag = false;
+            // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange
+            lagrangeTag = 1;
+            numArgsRemaining--; curArgPos++;
+        }
+        else if (strcmp(argv[curArgPos], "-lagrange") == 0)
+        {
+            readingEleTag = false;
+            // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange
+            lagrangeTag = 2;
+            numArgsRemaining--; curArgPos++;
+        }
+        else if (strcmp(argv[curArgPos], "-embed") == 0)
+        {
+            readingEleTag = false;
+            // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange
+            lagrangeTag = 3;
+            numArgsRemaining--; curArgPos++;
+        }
         else
         {
             if (readingEleTag)
@@ -759,7 +874,7 @@ TclCommand_GenerateToeInterfacePoints(ClientData clientData, Tcl_Interp *interp,
             cZ(pts_Count + jj) = this_radius * sin(t(jj));
 
             loc_theta(pts_Count + jj) = t(jj);
-            loc_rho(pts_Count + jj)   = 0.0;
+            loc_rho(pts_Count + jj)   = -1.0;
             pt_radius(pts_Count + jj) = this_radius;
         }
         pts_Count += this_nP;
@@ -808,27 +923,44 @@ TclCommand_GenerateToeInterfacePoints(ClientData clientData, Tcl_Interp *interp,
             if (inBounds)
             {
                 contactElemFlag = true;
-                //if (debugFlag)
+                if (debugFlag)
                     opserr << "Beam tag : " << beamTag << ", Solid tag : " << eleTags[ii] << ", Real Coordinates = (" << cXr(jj) << "," << cYr(jj) << "," << cZr(jj) << "), Iso Coordinates = (" << xi << "," << eta << "," << zeta << ")" << endln;
 
 
                 maxTag++;
-                theElement = new EmbeddedBeamInterface(maxTag, beamTag, eleTags[ii], transfTag, loc_rho(jj), loc_theta(jj), xi, eta, zeta, pt_radius(jj), area);
-
-                char buffer[40];
-                sprintf(buffer, "%10i", maxTag);
-                Tcl_AppendResult(interp, buffer, NULL);
-
-                // if one of the above worked
-                if (theElement != 0)
+                if (lagrangeTag > 1)
                 {
-                    if (theDomain.addElement(theElement) == false)
+                    eleTagsInContact.push_back(eleTags[ii]);
+                    contactPt_xi.push_back(xi);
+                    contactPt_eta.push_back(eta);
+                    contactPt_zeta.push_back(zeta);
+                    contactPt_rho.push_back(loc_rho(jj));
+                    contactPt_theta.push_back(loc_theta(jj));
+                    contactPt_radius.push_back(radius);
+                }
+                else
+                {
+                    // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange
+                    if (lagrangeTag == 0)
+                        theElement = new EmbeddedBeamInterface(maxTag, beamTag, eleTags[ii], transfTag, loc_rho(jj), loc_theta(jj), xi, eta, zeta, radius, area);
+                    else if (lagrangeTag == 1)
+                        theElement = new EmbeddedBeamInterfaceAL(maxTag, beamTag, eleTags[ii], transfTag, loc_rho(jj), loc_theta(jj), xi, eta, zeta, radius, area);
+
+                    char buffer[40];
+                    sprintf(buffer, "%10i", maxTag);
+                    Tcl_AppendResult(interp, buffer, NULL);
+
+                    if (theElement != 0)
                     {
-                        opserr << "WARNING could not add element with tag: " << theElement->getTag() << " and of type: "
-                            << theElement->getClassType() << " to the Domain\n";
-                        delete theElement;
-                        return -1;
+                        if (theDomain.addElement(theElement) == false)
+                        {
+                            opserr << "WARNING could not add element with tag: " << theElement->getTag() << " and of type: "
+                                << theElement->getClassType() << " to the Domain\n";
+                            delete theElement;
+                            return -1;
+                        }
                     }
+
                 }
 
                 if (writeCoords)
@@ -842,6 +974,40 @@ TclCommand_GenerateToeInterfacePoints(ClientData clientData, Tcl_Interp *interp,
             }
         }
     }
+
+    // 0 = local penalty, 1 = local Augmented Lagrangian, 2 = global Lagrange, 3 = global embedded lagrange
+    if (lagrangeTag > 1)
+    {
+        if (lagrangeTag == 2)
+        {
+            opserr << "This element is not implemented yet." << endln;
+            return -1;
+        }
+        else if (lagrangeTag == 3)
+            theElement = new EmbeddedBeamToeP(maxTag, beamTag, eleTagsInContact, transfTag, contactPt_rho, contactPt_theta, contactPt_xi, contactPt_eta, contactPt_zeta, contactPt_radius, radius, area);
+        else if (lagrangeTag == 4)
+        {
+            opserr << "This element is not implemented yet." << endln;
+            return -1;
+        }
+        char buffer[40];
+        sprintf(buffer, "%10i", maxTag);
+        Tcl_AppendResult(interp, buffer, NULL);
+
+        if (theElement != 0)
+        {
+            if (theDomain.addElement(theElement) == false)
+            {
+                opserr << "WARNING could not add element with tag: " << theElement->getTag() << " and of type: "
+                    << theElement->getClassType() << " to the Domain\n";
+                delete theElement;
+                return -1;
+            }
+        }
+    }
+
+    if (writeCoords)
+        crdsFile.close();
 
     opserr << "Number of elements in contact: " << (int)eleTagsInContact_unique.size() << ", number of contact points: " << contactPointCount << endln;
     opserr << "EmbeddedBeamInterface Elements " << startTag << " to " << maxTag << " were created." << endln;

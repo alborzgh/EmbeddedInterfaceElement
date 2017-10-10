@@ -49,9 +49,10 @@ class EmbeddedBeam : public Element
 {
 public:
     EmbeddedBeam(int tag);
-    EmbeddedBeam(int tag, int beamTag, std::vector <int> solidTag, int crdTransfTag, 
+    EmbeddedBeam(int tag, int beamTag, std::vector <int> solidTag, int crdTransfTag,
         std::vector <double>  beamRho, std::vector <double>  beamTheta, std::vector <double>  solidXi,
-        std::vector <double>  solidEta, std::vector <double>  solidZeta, double radius, double area);
+        std::vector <double>  solidEta, std::vector <double>  solidZeta, double radius, double area, 
+        const std::vector<int>& connectedBeamTags = std::vector<int>());
     EmbeddedBeam();
     ~EmbeddedBeam();
 
@@ -100,12 +101,15 @@ private:
     ID externalNodes; // Tags of beam and solid nodes
 
     Node **theNodes;
+    Element **theConnctedBeamElems;
 
     int *theSolidTag;
+    int *theConnectedBeamTag;
     int *solidNodeTags;
     int theBeamTag;
 
     Element* theBeam;
+    Vector m_beamDisp;
 
     SP_Constraint **theConstraints;
 
@@ -121,7 +125,11 @@ private:
     Vector m_beam_rho;
     Vector m_beam_theta;
 
-    int     m_numSolidNodes, m_numEmbeddedPoints;
+    bool m_isExternalBeamConnected;
+    int m_isFirstUpdate;
+    int  m_connectedNode;
+
+    int  m_numSolidNodes, m_numEmbeddedPoints, m_numConnectedBeams;
 
     // shape functions
     Vector  m_Ns;
@@ -159,6 +167,10 @@ private:
     Vector Getb1(void);                 // returns b1 = mQb(:,0)
     void   Setc1(Vector c1_vec);        // sets member vector c1
     Vector Getc1(void);                 // returns member vector c1
+
+    // define some functions for recording results purposes
+    Vector GetInteractionPtDisp();
+    Vector GetInteractionPtForce();
 
 };
 

@@ -17,42 +17,40 @@
 **   Filip C. Filippou (filippou@ce.berkeley.edu)                     **
 **                                                                    **
 ** ****************************************************************** */
-
+                                                                        
 // Written: Alborz Ghofrani, Diego Turello, Pedro Arduino, U.Washington 
 // Created: May 2017
-// Description: This file contains the class definition for EmbeddedBeamInterfaceP.
+// Description: This file contains the class definition for EmbeddedBeamContact.
 
-#ifndef EmbedBeamInterfaceP_h
-#define EmbedBeamInterfaceP_h
+#ifndef EmbedBeamContact_h
+#define EmbedBeamContact_h
 
 #include <Element.h>
 #include <Matrix.h>
 #include <Vector.h>
 #include <ID.h>
 
-#include <vector>
-#include <set>
-#include <map>
-
+// number of nodes per element
+#define EBC_NUM_NODE 10
 // number of dimensions
-#define EBIP_NUM_DIM  3
+#define EBC_NUM_DIM  3
+// degrees of freedom per element
+#define EBC_NUM_DOF  36
 
 class Node;
 class NDMaterial;
 class Response;
 class CrdTransf;
 
-class EmbeddedBeamInterfaceP : public Element
+class EmbeddedBeamContact : public Element
 {
-public:
-    EmbeddedBeamInterfaceP(int tag);
-    EmbeddedBeamInterfaceP(int tag, int beamTag, std::vector <int> solidTag, int crdTransfTag, 
-        std::vector <double>  beamRho, std::vector <double>  beamTheta, std::vector <double>  solidXi,
-        std::vector <double>  solidEta, std::vector <double>  solidZeta, double radius, double area);
-    EmbeddedBeamInterfaceP();
-    ~EmbeddedBeamInterfaceP();
+  public:
+	EmbeddedBeamContact(int tag);
+	EmbeddedBeamContact(int tag, int beamTag, int solidTag, int crdTransfTag, double beamRho, double beamTheta, double solidXi, double solidEta, double solidZeta, double radius, double area);
+    EmbeddedBeamContact();
+    ~EmbeddedBeamContact();
 
-    const char *getClassType(void) const { return "EmbeddedBeamInterfaceP"; };
+    const char *getClassType(void) const {return "EmbeddedBeamContact";};
 
     int getNumExternalNodes(void) const;
     const ID &getExternalNodes(void);
@@ -69,50 +67,46 @@ public:
 
     // public methods to obtain stiffness, mass, damping and residual information    
     const Matrix &getTangentStiff(void);
-    const Matrix &getInitialStiff(void);
+    const Matrix &getInitialStiff(void);    
 
-    const Vector &getResistingForce(void);
+    const Vector &getResistingForce(void);            
 
     // public methods for element output
     int sendSelf(int commitTag, Channel &theChannel);
-    int recvSelf(int commitTag, Channel &theChannel, FEM_ObjectBroker
-        &theBroker);
+    int recvSelf(int commitTag, Channel &theChannel, FEM_ObjectBroker 
+		  &theBroker);
     int displaySelf(Renderer &theViewer, int displayMode, float fact, const char **modes, int numMode);
-    void Print(OPS_Stream &s, int flag = 0);
+    void Print(OPS_Stream &s, int flag =0);
 
-    Response *setResponse(const char **argv, int argc,
-        OPS_Stream &s);
+    Response *setResponse(const char **argv, int argc, 
+			  OPS_Stream &s);
 
     int getResponse(int responseID, Information &eleInformation);
 
     int setParameter(const char **argv, int argc, Parameter &param);
     int updateParameter(int parameterID, Information &info);
-
-protected:
-
-private:
+	
+  protected:
+    
+  private:
     // private attributes - a copy for each object of the class
-    int EBIP_numNodes, EBIP_numDOF;
 
-    ID externalNodes; // Tags of beam and solid nodes
+    ID externalNodes; // Tags of quad and beam nodes
 
-    int *theSolidTag;
-    int *solidNodeTags;
-    int theBeamTag;
+	int theSolidTag, theBeamTag;
 
-    Node **theNodes;
-
-    Vector		m_InterfaceForces;	// force vector
-    Matrix		m_InterfaceStiffness;	// stiffness matrix
-
-    std::map<int, int> m_nodeMap;
+    Node *theNodes[10];
+	
+	static Vector		m_InterfaceForces;	// force vector
+	static Matrix		m_InterfaceStiffness;	// stiffness matrix
+	static const double m_Pi;
 
     // iso-parametric coordinates
-    Vector m_solid_xi;
-    Vector m_solid_eta;
-    Vector m_solid_zeta;
-    Vector m_beam_rho;
-    Vector m_beam_theta;
+    double m_solid_xi;
+    double m_solid_eta;
+    double m_solid_zeta;
+    double m_beam_rho;
+    double m_beam_theta;
 
     // shape functions
     Vector  m_Ns;
@@ -121,15 +115,13 @@ private:
 
     double	m_beam_radius;	 // beam Radius
     double  m_beam_length;   // beam length
-    double	m_ep;		     // penalty parameter
+	double	m_ep;		     // penalty parameter
     double  m_area;          // interface element area
-
-    int     m_numSolidNodes, m_numEmbeddedPoints;
 
     CrdTransf* crdTransf;  // pointer to coordinate tranformation object
 
     double  m_Force;
-    Vector  m_Lambda;
+    bool    inContact;
 
     Vector m_Ba_rot_n, m_Bb_rot_n;
     Vector m_Ba_disp_n, m_Bb_disp_n;
@@ -137,7 +129,9 @@ private:
     Vector m_B_loc, m_S_disp;
     Vector m_Ba1, m_Bb1;
     Vector m_pos;
+    Vector m_n;
 
+    int	   updateShapeFuncs();
 
     // copied from BeamContact3D
     double mchi;                // twist rotation from end 1 to end 2
@@ -145,14 +139,11 @@ private:
     Matrix mQb;                 // coordinate transform for node b
     Matrix mQc;
     Vector mc1;                 // tangent vector at project point c
-    Matrix mBphi, mBu, mHf;
-    Matrix mA, mB, mAt, mBt, mAAt, mBBt, mABt;
+    Matrix mBphi, mBu;
 
     void ComputeBphiAndBu(Matrix &Bphi, Matrix &Bu);            // method to compute Bphi and Bu, used in ComputeB and update
-    void ComputeHf(Matrix &Hf, double theta);                   // method to compute Hf
-    void UpdateTransforms(void);                                // method to update Qa, Qb
-    void ComputeQc();
-    int	 updateShapeFuncs(double xi, double eta, double zeta, double rho);             // method to update shape functions
+    void UpdateTransforms(void);         // method to update Qa, Qb
+    void ComputeQc();                    // method to compute Qc from Qa and Qb
 
     Matrix ExponentialMap(Vector theta); // function returns the exponential map of a vector
     Matrix ComputeSkew(Vector theta);    // function returns skew matrix of given vector
@@ -163,11 +154,7 @@ private:
     Vector Getb1(void);                 // returns b1 = mQb(:,0)
     void   Setc1(Vector c1_vec);        // sets member vector c1
     Vector Getc1(void);                 // returns member vector c1
-
-    // define some functions for recording results purposes
-    Vector GetInteractionPtDisp();
-    Vector GetInteractionPtForce();
-
+	
 };
 
 #endif

@@ -20,10 +20,10 @@
 
 // Written: Alborz Ghofrani, Diego Turello, Pedro Arduino, U.Washington 
 // Created: May 2017
-// Description: This file contains the class definition for EmbeddedBeamInterfaceP.
+// Description: This file contains the class definition for EmbeddedBeamInterfaceP2.
 
-#ifndef EmbedBeamInterfaceP_h
-#define EmbedBeamInterfaceP_h
+#ifndef EmbedBeamInterfaceP2_h
+#define EmbedBeamInterfaceP2_h
 
 #include <Element.h>
 #include <Matrix.h>
@@ -35,24 +35,24 @@
 #include <map>
 
 // number of dimensions
-#define EBIP_NUM_DIM  3
+#define EBIP2_NUM_DIM  3
 
 class Node;
 class NDMaterial;
 class Response;
 class CrdTransf;
 
-class EmbeddedBeamInterfaceP : public Element
+class EmbeddedBeamInterfaceP2 : public Element
 {
 public:
-    EmbeddedBeamInterfaceP(int tag);
-    EmbeddedBeamInterfaceP(int tag, int beamTag, std::vector <int> solidTag, int crdTransfTag, 
+    EmbeddedBeamInterfaceP2(int tag);
+    EmbeddedBeamInterfaceP2(int tag, int beamTag, std::vector <int> solidTag, int crdTransfTag, 
         std::vector <double>  beamRho, std::vector <double>  beamTheta, std::vector <double>  solidXi,
         std::vector <double>  solidEta, std::vector <double>  solidZeta, double radius, double area);
-    EmbeddedBeamInterfaceP();
-    ~EmbeddedBeamInterfaceP();
+    EmbeddedBeamInterfaceP2();
+    ~EmbeddedBeamInterfaceP2();
 
-    const char *getClassType(void) const { return "EmbeddedBeamInterfaceP"; };
+    const char *getClassType(void) const { return "EmbeddedBeamInterfaceP2"; };
 
     int getNumExternalNodes(void) const;
     const ID &getExternalNodes(void);
@@ -92,7 +92,7 @@ protected:
 
 private:
     // private attributes - a copy for each object of the class
-    int EBIP_numNodes, EBIP_numDOF;
+    int EBIP2_numNodes, EBIP2_numDOF;
 
     ID externalNodes; // Tags of beam and solid nodes
 
@@ -129,7 +129,6 @@ private:
     CrdTransf* crdTransf;  // pointer to coordinate tranformation object
 
     double  m_Force;
-    Vector  m_Lambda;
 
     Vector m_Ba_rot_n, m_Bb_rot_n;
     Vector m_Ba_disp_n, m_Bb_disp_n;
@@ -146,7 +145,9 @@ private:
     Matrix mQc;
     Vector mc1;                 // tangent vector at project point c
     Matrix mBphi, mBu, mHf;
-    Matrix mA, mB, mAt, mBt, mAAt, mBBt, mABt;
+    Matrix mA, mB;
+    Matrix mN, mH;
+    Matrix mKss, mKsb, mKbb;
 
     void ComputeBphiAndBu(Matrix &Bphi, Matrix &Bu);            // method to compute Bphi and Bu, used in ComputeB and update
     void ComputeHf(Matrix &Hf, double theta);                   // method to compute Hf
@@ -163,10 +164,6 @@ private:
     Vector Getb1(void);                 // returns b1 = mQb(:,0)
     void   Setc1(Vector c1_vec);        // sets member vector c1
     Vector Getc1(void);                 // returns member vector c1
-
-    // define some functions for recording results purposes
-    Vector GetInteractionPtDisp();
-    Vector GetInteractionPtForce();
 
 };
 

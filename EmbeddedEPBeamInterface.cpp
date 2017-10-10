@@ -20,9 +20,9 @@
 
 // Written: Alborz Ghofrani, Diego Turello, Pedro Arduino, U.Washington 
 // Created: May 2017
-// Description: This file contains the class definition for EmbeddedBeamInterfaceP.
+// Description: This file contains the class definition for EmbeddedEPBeamInterface.
 
-#include <EmbeddedBeamInterfaceP.h>
+#include <EmbeddedEPBeamInterface.h>
 #include <Node.h>
 #include <Matrix.h>
 #include <Vector.h>
@@ -40,22 +40,22 @@
 #include <cmath>
 #include <NodeIter.h>
 
-static int num_EmbeddedBeamInterfaceP = 0;
+static int num_EmbeddedEPBeamInterface = 0;
 static const double m_Pi = 3.14159265359;
 
 void *
-OPS_EmbeddedBeamInterfaceP(void)
+OPS_EmbeddedEPBeamInterface(void)
 {
-    if (num_EmbeddedBeamInterfaceP == 0) {
-        num_EmbeddedBeamInterfaceP++;
-        opserr << "EmbeddedBeamInterfaceP element - Written: A.Ghofrani, D.Turello, P.Arduino, U.Washington\n";
+    if (num_EmbeddedEPBeamInterface == 0) {
+        num_EmbeddedEPBeamInterface++;
+        opserr << "EmbeddedEPBeamInterface element - Written: A.Ghofrani, D.Turello, P.Arduino, U.Washington\n";
     }
 
     Element *theElement = 0;
 
     int numArgs = OPS_GetNumRemainingInputArgs();
     if (numArgs < 1) {
-        opserr << "Want: EmbeddedBeamInterfaceP tag? \n";
+        opserr << "Want: EmbeddedEPBeamInterface tag? \n";
         return 0;
     }
 
@@ -63,16 +63,16 @@ OPS_EmbeddedBeamInterfaceP(void)
     int eleTag = 0;
     int numData = 1;
     if (OPS_GetIntInput(&numData, iData) != 0) {
-        opserr << "WARNING invalid integer data: element EmbeddedBeamInterfaceP" << endln;
+        opserr << "WARNING invalid integer data: element EmbeddedEPBeamInterface" << endln;
         return 0;
     }
 
     eleTag = iData[0];
 
-    theElement = new EmbeddedBeamInterfaceP(iData[0]);
+    theElement = new EmbeddedEPBeamInterface(iData[0]);
 
     if (theElement == 0) {
-        opserr << "WARNING could not create element of type EmbeddedBeamInterfaceP\n";
+        opserr << "WARNING could not create element of type EmbeddedEPBeamInterface\n";
         return 0;
     }
 
@@ -80,21 +80,21 @@ OPS_EmbeddedBeamInterfaceP(void)
 }
 
 
-EmbeddedBeamInterfaceP::EmbeddedBeamInterfaceP(int tag) : Element(tag, ELE_TAG_EmbeddedBeamInterfaceP)
+EmbeddedEPBeamInterface::EmbeddedEPBeamInterface(int tag) : Element(tag, ELE_TAG_EmbeddedEPBeamInterface)
 {
 
 }
 
-EmbeddedBeamInterfaceP::EmbeddedBeamInterfaceP(int tag, int beamTag, std::vector <int> solidTag, int crdTransfTag, 
+EmbeddedEPBeamInterface::EmbeddedEPBeamInterface(int tag, int beamTag, std::vector <int> solidTag, int crdTransfTag, int matTag,
     std::vector <double>  beamRho, std::vector <double>  beamTheta, std::vector <double>  solidXi, std::vector <double>  solidEta,
-    std::vector <double>  solidZeta, double radius, double area): Element(tag, ELE_TAG_EmbeddedBeamInterfaceP),
-    m_beam_radius(radius), m_area(area), m_ep(1.0e13), m_Lambda(12),
+    std::vector <double>  solidZeta, double radius, double area, double width) : Element(tag, ELE_TAG_EmbeddedEPBeamInterface),
+    m_beam_radius(radius), m_area(area), theMatTag(matTag), m_ep(1.0e15), m_Lambda(12),
     m_Ba_rot_n(3), m_Bb_rot_n(3),
     m_Ba_disp_n(3), m_Bb_disp_n(3),
     m_Ba1(3), m_Bb1(3),
     m_Bcl_pos(3), m_Bcl_pos_n(3), m_pos(3),
     m_B_loc(3), m_S_disp(3),
-    mQa(3, 3), mQb(3, 3), mQc(3, 3), mc1(3),
+    mQa(3, 3), mQb(3, 3), mQc(3, 3), mc1(3), m_uRel(12),
     mBphi(3, 12), mBu(3, 12), mHf(3, 12), m_Ns(8)
 {
     // get domain to access element tags and their nodes
@@ -136,13 +136,13 @@ EmbeddedBeamInterfaceP::EmbeddedBeamInterfaceP(int tag, int beamTag, std::vector
     // opserr << endln;
 
     m_numSolidNodes = (int)uniqueNodeTags.size();
-    EBIP_numNodes = m_numSolidNodes     + 2;
-    EBIP_numDOF   = m_numSolidNodes * 3 + 12;
+    EEPBI_numNodes = m_numSolidNodes     + 2;
+    EEPBI_numDOF   = m_numSolidNodes * 3 + 12;
 
     // opserr << m_numSolidNodes << endln;
 
-    externalNodes = ID(EBIP_numNodes);
-    theNodes = new Node*[EBIP_numNodes];
+    externalNodes = ID(EEPBI_numNodes);
+    theNodes = new Node*[EEPBI_numNodes];
 
     int count = 0;
     for (std::set <int>::iterator it = uniqueNodeTags.begin(); it != uniqueNodeTags.end(); ++it)
@@ -159,8 +159,8 @@ EmbeddedBeamInterfaceP::EmbeddedBeamInterfaceP(int tag, int beamTag, std::vector
         count++;
     }
 
-    m_InterfaceForces    = Vector(EBIP_numDOF);
-    m_InterfaceStiffness = Matrix(EBIP_numDOF, EBIP_numDOF);
+    m_InterfaceForces    = Vector(EEPBI_numDOF);
+    m_InterfaceStiffness = Matrix(EEPBI_numDOF, EEPBI_numDOF);
 
     mA = Matrix(3 * m_numSolidNodes, 12);
     mB = Matrix(12, 12);
@@ -169,101 +169,166 @@ EmbeddedBeamInterfaceP::EmbeddedBeamInterfaceP(int tag, int beamTag, std::vector
     mAAt = Matrix(3 * m_numSolidNodes, 3 * m_numSolidNodes);
     mBBt = Matrix(12, 12);
     mABt = Matrix(3 * m_numSolidNodes, 12);
+    mBinv = Matrix(12, 12);
+    mBinvTAT = Matrix(12, 3 * m_numSolidNodes);
     
+    theMat = new NDMaterial*[m_numEmbeddedPoints];
+    for (int ii = 0; ii < m_numEmbeddedPoints; ii++)
+        theMat[ii] = OPS_getNDMaterial(matTag)->getCopy("3D");
 
+    if (width > 0)
+        m_intWidth = width;
+    else
+        m_intWidth = 0.1 * m_beam_radius;
 
     // get the coordinate transformation object
     crdTransf = OPS_GetCrdTransf(crdTransfTag)->getCopy3d();
 
 }
 
-EmbeddedBeamInterfaceP::EmbeddedBeamInterfaceP()
-    : Element(0, ELE_TAG_EmbeddedBeamInterfaceP)
+EmbeddedEPBeamInterface::EmbeddedEPBeamInterface()
+    : Element(0, ELE_TAG_EmbeddedEPBeamInterface)
 {
 
 }
 
-EmbeddedBeamInterfaceP::~EmbeddedBeamInterfaceP()
+EmbeddedEPBeamInterface::~EmbeddedEPBeamInterface()
 {
 
 }
 
 int
-EmbeddedBeamInterfaceP::getNumExternalNodes(void) const
+EmbeddedEPBeamInterface::getNumExternalNodes(void) const
 {
-    return EBIP_numNodes;
+    return EEPBI_numNodes;
 }
 
 const ID&
-EmbeddedBeamInterfaceP::getExternalNodes(void)
+EmbeddedEPBeamInterface::getExternalNodes(void)
 {
     return externalNodes;
 }
 
 Node **
-EmbeddedBeamInterfaceP::getNodePtrs(void)
+EmbeddedEPBeamInterface::getNodePtrs(void)
 {
     return theNodes;
 }
 
 int
-EmbeddedBeamInterfaceP::getNumDOF(void)
+EmbeddedEPBeamInterface::getNumDOF(void)
 {
-    return EBIP_numDOF;
+    return EEPBI_numDOF;
 }
 
 int
-EmbeddedBeamInterfaceP::revertToLastCommit(void)
+EmbeddedEPBeamInterface::revertToLastCommit(void)
 {
     return 0;
 }
 
 int
-EmbeddedBeamInterfaceP::revertToStart(void)
+EmbeddedEPBeamInterface::revertToStart(void)
 {
     return 0;
 }
 
 
 const Matrix&
-EmbeddedBeamInterfaceP::getTangentStiff(void)
+EmbeddedEPBeamInterface::getTangentStiff(void)
 {
     m_InterfaceStiffness.Zero();
+    int Cep_map [3][3];
 
+    Cep_map[0][0] = 0;
+    Cep_map[0][1] = 3;
+    Cep_map[0][2] = 5;
+    Cep_map[1][0] = 3;
+    Cep_map[1][1] = 1;
+    Cep_map[1][2] = 4;
+    Cep_map[2][0] = 5;
+    Cep_map[2][1] = 4;
+    Cep_map[2][2] = 2;
+
+
+    Matrix Kd(12, 12);
+
+    for (int ii = 0; ii < m_numEmbeddedPoints; ii++)
+    {
+        Matrix Cep(6, 6);
+        Matrix temp(3, 3);
+
+        updateShapeFuncs(m_solid_xi(ii), m_solid_eta(ii), m_solid_zeta(ii), m_beam_rho(ii));
+        ComputeBphiAndBu(mBphi, mBu);
+
+        Cep = theMat[ii]->getTangent();
+
+        // set c1 first
+        Vector c1(3), c2(3), c3(3);
+        for (int jj = 0; jj < 3; jj++)
+        {
+            c1(jj) = mQc(jj, 0);
+            c2(jj) = mQc(jj, 1);
+            c3(jj) = mQc(jj, 2);
+        }
+
+        Matrix Hb(3, 12), HbT(12,3);
+        Hb = mBu - (m_beam_radius*(cos(m_beam_theta(ii))*ComputeSkew(c2) + sin(m_beam_theta(ii))*ComputeSkew(c3))) * mBphi;
+        HbT = Transpose(3, 12, Hb);
+
+        Vector n(3);
+        n = cos(m_beam_theta(ii)) *c2 + sin(m_beam_theta(ii))*c3;
+
+        temp.Zero();
+        for (int jj = 0; jj < 3; jj++)
+            for (int kk = 0; kk < 3; kk++)
+                for (int mm = 0; mm < 3; mm++)
+                    for (int nn = 0; nn < 3; nn++)
+                        temp(jj, kk) += Cep(Cep_map[jj][nn], Cep_map[kk][mm]) * n(mm) * n(nn);
+
+        Kd += HbT * temp * Hb;
+
+    }
+    Kd *= m_area * m_area / m_intWidth;
+
+    Matrix Kss(3 * m_numSolidNodes, 3 * m_numSolidNodes);
+    Matrix Ksb(3 * m_numSolidNodes, 12);
+
+    Kss = mA * mBinv * Kd * mBinvTAT;
+    Ksb = -1.0 * mA * mBinv * Kd;
 
     for (int ii = 0; ii < 3 * m_numSolidNodes; ii++)
         for (int jj = 0; jj < 3 * m_numSolidNodes; jj++)
-            m_InterfaceStiffness(ii, jj) = mAAt(ii, jj);
+            m_InterfaceStiffness(ii, jj) = Kss(ii, jj);
 
     for (int ii = 0; ii < 3 * m_numSolidNodes; ii++)
         for (int jj = 0; jj < 12; jj++)
         {
-            m_InterfaceStiffness(ii, 3 * m_numSolidNodes + jj) = -1.0 * mABt(ii, jj);
-            m_InterfaceStiffness(3 * m_numSolidNodes + jj, ii) = -1.0 * mABt(ii, jj);
+            m_InterfaceStiffness(ii, 3 * m_numSolidNodes + jj) = Ksb(ii, jj);
+            m_InterfaceStiffness(3 * m_numSolidNodes + jj, ii) = Ksb(ii, jj);
         }
 
     for (int ii = 0; ii < 12; ii++)
         for (int jj = 0; jj < 12; jj++)
-            m_InterfaceStiffness(3 * m_numSolidNodes + ii, 3 * m_numSolidNodes + jj) = mBBt(ii, jj);
+            m_InterfaceStiffness(3 * m_numSolidNodes + ii, 3 * m_numSolidNodes + jj) = Kd(ii, jj);
 
-    m_InterfaceStiffness *= m_ep;
     return m_InterfaceStiffness;
 }
 
 const Matrix&
-EmbeddedBeamInterfaceP::getInitialStiff(void)
+EmbeddedEPBeamInterface::getInitialStiff(void)
 {
     return this->getTangentStiff();
 }
 
 const Vector&
-EmbeddedBeamInterfaceP::getResistingForce(void)
+EmbeddedEPBeamInterface::getResistingForce(void)
 {
     m_InterfaceForces.Zero();
     Vector temp2(12), temp(3 * m_numSolidNodes);
 
-    temp = mA * m_Lambda;
-    temp2 = -1.0 * mB * m_Lambda;
+    temp = -1.0 * mA * mBinv * m_Lambda;
+    temp2 = m_Lambda;
 
     for (int ii = 0; ii < 3 * m_numSolidNodes; ii++)
         m_InterfaceForces(ii) = temp(ii);
@@ -274,32 +339,32 @@ EmbeddedBeamInterfaceP::getResistingForce(void)
 }
 
 int
-EmbeddedBeamInterfaceP::sendSelf(int commitTag, Channel &theChannel)
+EmbeddedEPBeamInterface::sendSelf(int commitTag, Channel &theChannel)
 {
     return 0;
 }
 
 int
-EmbeddedBeamInterfaceP::recvSelf(int commitTag, Channel &theChannel, FEM_ObjectBroker
+EmbeddedEPBeamInterface::recvSelf(int commitTag, Channel &theChannel, FEM_ObjectBroker
     &theBroker)
 {
     return 0;
 }
 
 int
-EmbeddedBeamInterfaceP::displaySelf(Renderer &theViewer, int displayMode, float fact, const char **modes, int numMode)
+EmbeddedEPBeamInterface::displaySelf(Renderer &theViewer, int displayMode, float fact, const char **modes, int numMode)
 {
     return 0;
 }
 
 void
-EmbeddedBeamInterfaceP::Print(OPS_Stream &s, int flag)
+EmbeddedEPBeamInterface::Print(OPS_Stream &s, int flag)
 {
     return;
 }
 
 Response*
-EmbeddedBeamInterfaceP::setResponse(const char **argv, int argc,
+EmbeddedEPBeamInterface::setResponse(const char **argv, int argc,
     OPS_Stream &s)
 {
     if (strcmp(argv[0], "force") == 0 || strcmp(argv[0], "globalForce") == 0) {
@@ -328,14 +393,14 @@ EmbeddedBeamInterfaceP::setResponse(const char **argv, int argc,
 
     }
     else {
-        opserr << "EmbeddedBeamInterfaceP Recorder, " << argv[0] << "is an unknown recorder request"
+        opserr << "EmbeddedEPBeamInterface Recorder, " << argv[0] << "is an unknown recorder request"
             << "  Element tag : " << this->getTag() << endln;
         return 0;
     }
 }
 
 int
-EmbeddedBeamInterfaceP::getResponse(int responseID, Information &eleInformation)
+EmbeddedEPBeamInterface::getResponse(int responseID, Information &eleInformation)
 {
     // TODO: Needs to be updated
     if (responseID == 1) // force
@@ -366,26 +431,26 @@ EmbeddedBeamInterfaceP::getResponse(int responseID, Information &eleInformation)
         return eleInformation.setVector(temp);
     }
     else {
-        opserr << "EmbeddedBeamInterfaceP, tag = " << this->getTag()
+        opserr << "EmbeddedEPBeamInterface, tag = " << this->getTag()
             << " -- unknown request" << endln;
         return -1;
     }
 }
 
 int
-EmbeddedBeamInterfaceP::setParameter(const char **argv, int argc, Parameter &param)
+EmbeddedEPBeamInterface::setParameter(const char **argv, int argc, Parameter &param)
 {
     return 0;
 }
 
 int
-EmbeddedBeamInterfaceP::updateParameter(int parameterID, Information &info)
+EmbeddedEPBeamInterface::updateParameter(int parameterID, Information &info)
 {
     return 0;
 }
 
 void
-EmbeddedBeamInterfaceP::setDomain(Domain *theDomain)
+EmbeddedEPBeamInterface::setDomain(Domain *theDomain)
 {
     for (int ii = 0; ii < m_numSolidNodes + 2; ii++)
     {
@@ -442,8 +507,6 @@ EmbeddedBeamInterfaceP::setDomain(Domain *theDomain)
     // calculate A and B
     mA.Zero();
     mB.Zero();
-    Matrix mC = mA;
-    Matrix mD = mB;
     for (int ii = 0; ii < m_numEmbeddedPoints; ii++)
     {
         updateShapeFuncs(m_solid_xi(ii), m_solid_eta(ii), m_solid_zeta(ii), m_beam_rho(ii));
@@ -453,27 +516,6 @@ EmbeddedBeamInterfaceP::setDomain(Domain *theDomain)
         Element * theElement = theDomain->getElement(theSolidTag[ii]);
         double oneOver2PiR = 0.5 / m_Pi / m_beam_radius * m_area;
         double oneOver2PiR2 = oneOver2PiR / m_beam_radius;
-        /*for (int jj = 0; jj < 8; jj++)
-        {
-        int nodeInA = m_nodeMap[theElement->getNodePtrs()[jj]->getTag()];
-        mA(3 * nodeInA, 0) += oneOver2PiR * m_Ns(jj)*m_Nb1;
-        mA(3 * nodeInA, 6) += oneOver2PiR * m_Ns(jj)*m_Nb2;
-        mA(3 * nodeInA + 1, 1) += oneOver2PiR * m_Ns(jj)*m_Nb1;
-        mA(3 * nodeInA + 1, 7) += oneOver2PiR * m_Ns(jj)*m_Nb2;
-        mA(3 * nodeInA + 2, 2) += oneOver2PiR * m_Ns(jj)*m_Nb1;
-        mA(3 * nodeInA + 2, 8) += oneOver2PiR * m_Ns(jj)*m_Nb2;
-
-        mA(3 * nodeInA, 5) += -oneOver2PiR2 * m_Ns(jj) * m_Nb1 * sin(m_beam_theta(ii));
-        mA(3 * nodeInA + 1, 5) += oneOver2PiR2 * m_Ns(jj) * m_Nb1 * cos(m_beam_theta(ii));
-        mA(3 * nodeInA + 2, 3) += 2.0 * oneOver2PiR2 * m_Ns(jj) * m_Nb1 * sin(m_beam_theta(ii));
-        mA(3 * nodeInA + 2, 4) += -2.0 * oneOver2PiR2 * m_Ns(jj) * m_Nb1 * cos(m_beam_theta(ii));
-
-        mA(3 * nodeInA, 11) += -oneOver2PiR2 * m_Ns(jj) * m_Nb2 * sin(m_beam_theta(ii));
-        mA(3 * nodeInA + 1, 11) += oneOver2PiR2 * m_Ns(jj) * m_Nb2 * cos(m_beam_theta(ii));
-        mA(3 * nodeInA + 2, 9) += 2.0 * oneOver2PiR2 * m_Ns(jj) * m_Nb2 * sin(m_beam_theta(ii));
-        mA(3 * nodeInA + 2, 10) += -2.0 * oneOver2PiR2 * m_Ns(jj) * m_Nb2 * cos(m_beam_theta(ii));
-
-        }*/
 
         for (int jj = 0; jj < 8; jj++)
         {
@@ -489,8 +531,6 @@ EmbeddedBeamInterfaceP::setDomain(Domain *theDomain)
             }
         }
 
-        //opserr << mA << mC;
-
         ComputeBphiAndBu(mBphi, mBu);
 
         // I need to update Qc as well!
@@ -504,54 +544,9 @@ EmbeddedBeamInterfaceP::setDomain(Domain *theDomain)
 
         Matrix Hb(3, 12);
         Hb = mBu - (m_beam_radius*(cos(m_beam_theta(ii))*ComputeSkew(c2) + sin(m_beam_theta(ii))*ComputeSkew(c3))) * mBphi;
-        // opserr << Hb;
-        // Hb.Zero();
-        // Hb(0, 0) =  m_Hb1;
-        // Hb(0, 4) =  m_Hb2;
-        // Hb(0, 5) = -m_Nb1 * m_beam_radius * sin(m_beam_theta(ii));
-        // Hb(1, 1) =  m_Hb1;
-        // Hb(1, 3) =  m_Hb2;
-        // Hb(1, 5) =  m_Nb1 * m_beam_radius * cos(m_beam_theta(ii));
-        // Hb(2, 0) = -m_beam_radius * m_dH1 * cos(m_beam_theta(ii));
-        // Hb(2, 1) = -m_beam_radius * m_dH1 * sin(m_beam_theta(ii));
-        // Hb(2, 2) =  m_Nb1;
-        // Hb(2, 3) = -m_beam_radius * m_dH2 * sin(m_beam_theta(ii));
-        // Hb(2, 4) = -m_beam_radius * m_dH2 * cos(m_beam_theta(ii));
-        // 
-        // Hb(0, 6)  =  m_Hb3;
-        // Hb(0, 10) =  m_Hb4;
-        // Hb(0, 11) = -m_Nb2 * m_beam_radius * sin(m_beam_theta(ii));
-        // Hb(1, 7)  =  m_Hb3;
-        // Hb(1, 9)  =  m_Hb4;
-        // Hb(1, 11) =  m_Nb2 * m_beam_radius * cos(m_beam_theta(ii));
-        // Hb(2, 6)  = -m_beam_radius * m_dH3 * cos(m_beam_theta(ii));
-        // Hb(2, 7)  = -m_beam_radius * m_dH3 * sin(m_beam_theta(ii));
-        // Hb(2, 8)  =  m_Nb2;
-        // Hb(2, 9)  = -m_beam_radius * m_dH4 * sin(m_beam_theta(ii));
-        // Hb(2, 10) = -m_beam_radius * m_dH4 * cos(m_beam_theta(ii));
-        // opserr << Hb;
-
-        // for (int jj = 0; jj < 12; jj++)
-        // {
-        //     for (int kk = 0; kk < 3; kk++)
-        //     {
-        //         mB(jj    , kk) += oneOver2PiR * m_Nb1 * Hb(kk, jj);
-        //         mB(jj + 6, kk) += oneOver2PiR * m_Nb2 * Hb(kk, jj);
-        //     }
-        // 
-        //     mB(jj, 3)  +=  2.0 * oneOver2PiR2 * m_Nb1 * sin(m_beam_theta(ii)) * Hb(2, jj);
-        //     mB(jj, 9)  +=  2.0 * oneOver2PiR2 * m_Nb2 * sin(m_beam_theta(ii)) * Hb(2, jj);
-        //     mB(jj, 4)  += -2.0 * oneOver2PiR2 * m_Nb1 * cos(m_beam_theta(ii)) * Hb(2, jj);
-        //     mB(jj, 10) += -2.0 * oneOver2PiR2 * m_Nb2 * cos(m_beam_theta(ii)) * Hb(2, jj);
-        //     mB(jj, 5)  += oneOver2PiR2 * m_Nb1 * (Hb(1, jj) * cos(m_beam_theta(ii)) - Hb(0, jj) * sin(m_beam_theta(ii)));
-        //     mB(jj, 11) += oneOver2PiR2 * m_Nb2 * (Hb(1, jj) * cos(m_beam_theta(ii)) - Hb(0, jj) * sin(m_beam_theta(ii)));
-        // }
 
         Matrix HbT = Transpose(3, 12, Hb);
         mB += HbT * mHf;
-        // mD += HbT * mHf;
-        // opserr << mB << mD;
-
     }
     mA *= m_area;
     mB *= m_area;
@@ -560,16 +555,15 @@ EmbeddedBeamInterfaceP::setDomain(Domain *theDomain)
     mAAt = mA * mAt;
     mBBt = mB * mBt;
     mABt = mA * mBt;
-
-    // opserr << "mA = " << mA;
-    // opserr << "mB = " << mB;
+    mB.Invert(mBinv);
+    mBinvTAT = Transpose(12, 12, mBinv) * mAt;
 
     this->DomainComponent::setDomain(theDomain);
     return;
 }
 
 int
-EmbeddedBeamInterfaceP::update(void)
+EmbeddedEPBeamInterface::update(void)
 {
     Vector sDisp(3 * m_numSolidNodes), bDisp(12);
     for (int ii = 0; ii < m_numSolidNodes; ii++)
@@ -584,26 +578,77 @@ EmbeddedBeamInterfaceP::update(void)
         bDisp(jj) = theNodes[m_numSolidNodes]->getTrialDisp()(jj);
         bDisp(jj + 6) = theNodes[m_numSolidNodes + 1]->getTrialDisp()(jj);
     }
+
+    m_Lambda.Zero();
  
-    m_Lambda = m_ep * (mAt * sDisp - mBt * bDisp);
+    m_uRel = bDisp - mBinvTAT * sDisp;
+
+    for (int ii = 0; ii < m_numEmbeddedPoints; ii++) 
+    {
+
+        updateShapeFuncs(m_solid_xi(ii), m_solid_eta(ii), m_solid_zeta(ii), m_beam_rho(ii));
+        ComputeBphiAndBu(mBphi, mBu);
+
+        // set c1 first
+        Vector c1(3), c2(3), c3(3);
+        for (int jj = 0; jj < 3; jj++)
+        {
+            c1(jj) = mQc(jj, 0);
+            c2(jj) = mQc(jj, 1);
+            c3(jj) = mQc(jj, 2);
+        }
+        
+        Matrix Hb(3, 12), HbT(12, 3);
+        Hb  = mBu - (m_beam_radius*(cos(m_beam_theta(ii))*ComputeSkew(c2) + sin(m_beam_theta(ii))*ComputeSkew(c3))) * mBphi;
+        HbT = Transpose(3, 12, Hb);
+
+        Vector loc_relDisp(3);
+        loc_relDisp = Hb * m_uRel;
+
+        Vector n(3);
+        n = cos(m_beam_theta(ii)) *c2 + sin(m_beam_theta(ii))*c3;
+
+        Vector eps(6), sig(6);
+        eps(0) = loc_relDisp(0) * n(0);
+        eps(1) = loc_relDisp(1) * n(1);
+        eps(2) = loc_relDisp(2) * n(2);
+        eps(3) = loc_relDisp(0) * n(1) + loc_relDisp(1) * n(0);
+        eps(4) = loc_relDisp(1) * n(2) + loc_relDisp(2) * n(1);
+        eps(5) = loc_relDisp(0) * n(2) + loc_relDisp(2) * n(0);
+
+        eps *= 1/m_intWidth;
+
+        theMat[ii]->setTrialStrain(eps);
+        sig = theMat[ii]->getStress();
+
+        Vector sig_n(3);
+        sig_n(0) = sig(0) * n(0) + sig(3) * n(1) + sig(5) * n(2);
+        sig_n(1) = sig(3) * n(0) + sig(1) * n(1) + sig(4) * n(2);
+        sig_n(2) = sig(5) * n(0) + sig(4) * n(1) + sig(2) * n(2);
+
+        m_Lambda += HbT * sig_n;
+
+    }
+    m_Lambda *= m_area * m_area;
+
 
     return 0;
 }
 
 int
-EmbeddedBeamInterfaceP::commitState(void)
+EmbeddedEPBeamInterface::commitState(void)
 {
     int retVal = 0;
 
     // call element commitState to do any base class stuff
     if ((retVal = this->Element::commitState()) != 0) {
-        opserr << "EmbeddedBeamInterfaceP::commitState() - failed in base class";
+        opserr << "EmbeddedEPBeamInterface::commitState() - failed in base class";
     }
 
     return retVal;
 }
 
-int EmbeddedBeamInterfaceP::updateShapeFuncs(double xi, double eta, double zeta, double rho)
+int EmbeddedEPBeamInterface::updateShapeFuncs(double xi, double eta, double zeta, double rho)
 {
     if ((xi < -1.0) || (xi > 1.0) || (eta < -1.0) || (eta > 1.0) || (zeta < -1.0) || (zeta > 1.0))
     {
@@ -646,7 +691,7 @@ int EmbeddedBeamInterfaceP::updateShapeFuncs(double xi, double eta, double zeta,
 }
 
 Vector
-EmbeddedBeamInterfaceP::CrossProduct(const Vector &V1, const Vector &V2)
+EmbeddedEPBeamInterface::CrossProduct(const Vector &V1, const Vector &V2)
 {
     Vector V3(3);
 
@@ -658,7 +703,7 @@ EmbeddedBeamInterfaceP::CrossProduct(const Vector &V1, const Vector &V2)
 }
 
 Vector
-EmbeddedBeamInterfaceP::Geta1(void) 
+EmbeddedEPBeamInterface::Geta1(void) 
 {
     Vector a1(3);
     int i;
@@ -671,7 +716,7 @@ EmbeddedBeamInterfaceP::Geta1(void)
 }
 
 Vector
-EmbeddedBeamInterfaceP::Getb1(void) 
+EmbeddedEPBeamInterface::Getb1(void) 
 {
     Vector b1(3);
     int i;
@@ -684,7 +729,7 @@ EmbeddedBeamInterfaceP::Getb1(void)
 }
 
 void
-EmbeddedBeamInterfaceP::Setc1(Vector c1_vec) 
+EmbeddedEPBeamInterface::Setc1(Vector c1_vec) 
 {
     mc1 = c1_vec;
 
@@ -692,13 +737,13 @@ EmbeddedBeamInterfaceP::Setc1(Vector c1_vec)
 }
 
 Vector
-EmbeddedBeamInterfaceP::Getc1(void) {
+EmbeddedEPBeamInterface::Getc1(void) {
     return mc1;
 }
 
 
 Matrix
-EmbeddedBeamInterfaceP::Transpose(int dim1, int dim2, const Matrix &M)
+EmbeddedEPBeamInterface::Transpose(int dim1, int dim2, const Matrix &M)
 {
     // copied from transpose function in Brick.cpp
 
@@ -713,7 +758,7 @@ EmbeddedBeamInterfaceP::Transpose(int dim1, int dim2, const Matrix &M)
 
 
 Matrix
-EmbeddedBeamInterfaceP::ComputeSkew(Vector th)
+EmbeddedEPBeamInterface::ComputeSkew(Vector th)
 {
     Matrix skew_th(3, 3);
 
@@ -731,7 +776,7 @@ EmbeddedBeamInterfaceP::ComputeSkew(Vector th)
 }
 
 void
-EmbeddedBeamInterfaceP::ComputeBphiAndBu(Matrix &Bphi, Matrix &Bu)
+EmbeddedEPBeamInterface::ComputeBphiAndBu(Matrix &Bphi, Matrix &Bu)
 {
     int i, j;
     Matrix dummy1(3, 3);
@@ -857,7 +902,7 @@ EmbeddedBeamInterfaceP::ComputeBphiAndBu(Matrix &Bphi, Matrix &Bu)
     return;
 }
 
-void EmbeddedBeamInterfaceP::ComputeHf(Matrix & Hf, double theta)
+void EmbeddedEPBeamInterface::ComputeHf(Matrix & Hf, double theta)
 {
     Hf.Zero();
     double oneOver2PiR = 0.5 / m_Pi / m_beam_radius * m_area;
@@ -882,7 +927,7 @@ void EmbeddedBeamInterfaceP::ComputeHf(Matrix & Hf, double theta)
 }
 
 void
-EmbeddedBeamInterfaceP::UpdateTransforms(void)
+EmbeddedEPBeamInterface::UpdateTransforms(void)
 {
     Vector temp_a(6);           // trial disp/rot vector at a(total disp/rot)
     Vector temp_b(6);           // trial disp/rot vector at a(total disp/rot) 
@@ -916,7 +961,7 @@ EmbeddedBeamInterfaceP::UpdateTransforms(void)
 }
 
 void
-EmbeddedBeamInterfaceP::ComputeQc()
+EmbeddedEPBeamInterface::ComputeQc()
 {
     Vector c1(3);         // tangent vector at projection point, c
     Vector a1(3);         // tangent vector at a
@@ -958,7 +1003,7 @@ EmbeddedBeamInterfaceP::ComputeQc()
 }
 
 Matrix
-EmbeddedBeamInterfaceP::ExponentialMap(Vector th)
+EmbeddedEPBeamInterface::ExponentialMap(Vector th)
 {
     double theta = th.Norm();             // vector norm
     Matrix sk_theta(3,3);    // skew of vector
@@ -983,7 +1028,7 @@ EmbeddedBeamInterfaceP::ExponentialMap(Vector th)
     return Q;
 }
 
-Vector EmbeddedBeamInterfaceP::GetInteractionPtDisp()
+Vector EmbeddedEPBeamInterface::GetInteractionPtDisp()
 {
     Vector res(3 * m_numEmbeddedPoints);
     Vector c2(3), c3(3);
@@ -1023,7 +1068,7 @@ Vector EmbeddedBeamInterfaceP::GetInteractionPtDisp()
     return res;
 }
 
-Vector EmbeddedBeamInterfaceP::GetInteractionPtForce()
+Vector EmbeddedEPBeamInterface::GetInteractionPtForce()
 {
     Vector res(3 * m_numEmbeddedPoints);
     Vector ptForces(3);
